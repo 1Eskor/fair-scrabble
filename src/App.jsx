@@ -1190,32 +1190,42 @@ export default function App() {
         wordValidity.set(w, isValid);
       }
 
-        for (const w of scoreData.words) {
-          if (!wordValidity.get(w)) {
-            let isForgiven = false;
-            // Check if this invalid word is part of an intersection group and can be forgiven
-            if (scoreData.intersectionGroups) {
-              for (const group of scoreData.intersectionGroups) {
-                if (group.leftWords.includes(w)) {
-                  if (group.rightWords.every(rw => wordValidity.get(rw))) {
-                    isForgiven = true;
-                    break;
-                  }
-                } else if (group.rightWords.includes(w)) {
-                  if (group.leftWords.every(lw => wordValidity.get(lw))) {
-                    isForgiven = true;
-                    break;
-                  }
+      const isSingleTilePlay = Object.keys(tentativePlaced).length === 1;
+      const hasAtLeastOneValidWord = Array.from(wordValidity.values()).some(v => v);
+
+      for (const w of scoreData.words) {
+        if (!wordValidity.get(w)) {
+          let isForgiven = false;
+
+          // Single tile rule: If you play a single letter and it forms multiple words, 
+          // it only needs to form at least ONE valid word to be allowed.
+          if (isSingleTilePlay && hasAtLeastOneValidWord) {
+            isForgiven = true;
+          }
+
+          // Check if this invalid word is part of an intersection group and can be forgiven
+          if (!isForgiven && scoreData.intersectionGroups) {
+            for (const group of scoreData.intersectionGroups) {
+              if (group.leftWords.includes(w)) {
+                if (group.rightWords.every(rw => wordValidity.get(rw))) {
+                  isForgiven = true;
+                  break;
+                }
+              } else if (group.rightWords.includes(w)) {
+                if (group.leftWords.every(lw => wordValidity.get(lw))) {
+                  isForgiven = true;
+                  break;
                 }
               }
             }
+          }
 
-            if (!isForgiven) {
-              setError(`"${w.forwardWord}" was not recognized as a valid English word! Play rejected.`);
-              return;
-            }
+          if (!isForgiven) {
+            setError(`"${w.forwardWord}" was not recognized as a valid English word! Play rejected.`);
+            return;
           }
         }
+      }
     }
 
     // Success! Update Firestore room
