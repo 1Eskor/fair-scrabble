@@ -820,13 +820,17 @@ export default function App() {
       // Select candidate crossing axes based on the primary axis type (orthogonal vs diagonal)
       let candidateDirs = [];
       if (isPrimaryDiagonal) {
-        // Diagonal play: perpendicular crossing axis is the other diagonal
+        // Diagonal play: scan the other diagonal AND both orthogonal axes (Horizontal/Vertical)
+        // This ensures parallel diagonal plays (which form orthogonal cross-words) are caught.
         candidateDirs = [
           { dr: 1, dc: 1 },
-          { dr: -1, dc: 1 }
+          { dr: -1, dc: 1 },
+          { dr: 0, dc: 1 },
+          { dr: 1, dc: 0 }
         ];
       } else {
-        // Orthogonal (horizontal/vertical) play: perpendicular crossing axis is the other orthogonal axis
+        // Orthogonal (horizontal/vertical) play: perpendicular crossing axis is the other orthogonal axis.
+        // We explicitly DO NOT scan diagonals here, so horizontal plays don't accidentally score diagonal adjacencies.
         candidateDirs = [
           { dr: 0, dc: 1 },
           { dr: 1, dc: 0 }
@@ -1003,9 +1007,49 @@ export default function App() {
       }
     }
 
+    // --- IDENTIFY INTERSECTION GROUPS ---
+    // Rule: When an axis is intersecting (e.g. Diagonal crossing Horizontal), 
+    // there are 2 connecting tiles (the newly placed tiles before and after the shared existing tile).
+    // Only 1 of those 2 connecting tiles needs to form a valid cross-word.
+    const intersectionGroups = [];
+    if (!isFirstMove && coords.length > 1) {
+      let mainWord = null;
+      const mainAxis = normalizeDirection(direction);
+      mainWord = formedWordsList.find(w => w.axis.dr === mainAxis.dr && w.axis.dc === mainAxis.dc);
+      
+      if (mainWord && mainWord.cells) {
+        for (let i = 1; i < mainWord.cells.length - 1; i++) {
+          const cell = mainWord.cells[i];
+          if (!cell.isNew) { // This is a shared tile (the intersection point)
+            const prevCell = mainWord.cells[i-1];
+            const nextCell = mainWord.cells[i+1];
+            if (prevCell && prevCell.isNew && nextCell && nextCell.isNew) {
+              const isAdjacent = (r1, c1, r2, c2) => Math.abs(r1 - r2) <= 1 && Math.abs(c1 - c2) <= 1;
+              // Left connecting words: cross-words containing prevCell AND an existing tile adjacent to the shared cell
+              const leftWords = formedWordsList.filter(w => 
+                w !== mainWord && 
+                w.cells.some(c => c.r === prevCell.r && c.c === prevCell.c) &&
+                w.cells.some(c => !c.isNew && isAdjacent(c.r, c.c, cell.r, cell.c))
+              );
+              // Right connecting words: cross-words containing nextCell AND an existing tile adjacent to the shared cell
+              const rightWords = formedWordsList.filter(w => 
+                w !== mainWord && 
+                w.cells.some(c => c.r === nextCell.r && c.c === nextCell.c) &&
+                w.cells.some(c => !c.isNew && isAdjacent(c.r, c.c, cell.r, cell.c))
+              );
+              if (leftWords.length > 0 && rightWords.length > 0) {
+                intersectionGroups.push({ leftWords, rightWords });
+              }
+            }
+          }
+        }
+      }
+    }
+
     return {
       valid: true,
       words: formedWordsList,
+      intersectionGroups,
       bingoBonus,
       totalScore: formedWordsList.reduce((sum, w) => sum + w.score, 0) + bingoBonus
     };
@@ -1035,13 +1079,38 @@ export default function App() {
       // In strict mode, we'll verify online via dictionary api.
       setError("Verifying words with online dictionary dictionaryapi.dev...");
       try {
+        const wordValidity = new Map();
         for (const w of scoreData.words) {
           const isValid = await checkWordOnline(w.forwardWord) ||
             (roomData.backwardsAllowed && await checkWordOnline(w.backwardWord)) ||
             (roomData.diagonalBackwardsAllowed && await checkWordOnline(w.backwardWord));
-          if (!isValid) {
-            setError(`"${w.forwardWord}" was not recognized as a valid English word! Play rejected.`);
-            return;
+          wordValidity.set(w, isValid);
+        }
+
+        for (const w of scoreData.words) {
+          if (!wordValidity.get(w)) {
+            let isForgiven = false;
+            // Check if this invalid word is part of an intersection group and can be forgiven
+            if (scoreData.intersectionGroups) {
+              for (const group of scoreData.intersectionGroups) {
+                if (group.leftWords.includes(w)) {
+                  if (group.rightWords.every(rw => wordValidity.get(rw))) {
+                    isForgiven = true;
+                    break;
+                  }
+                } else if (group.rightWords.includes(w)) {
+                  if (group.leftWords.every(lw => wordValidity.get(lw))) {
+                    isForgiven = true;
+                    break;
+                  }
+                }
+              }
+            }
+
+            if (!isForgiven) {
+              setError(`"${w.forwardWord}" was not recognized as a valid English word! Play rejected.`);
+              return;
+            }
           }
         }
       } catch (err) {
