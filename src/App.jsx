@@ -212,6 +212,14 @@ export default function App() {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  // Lobby Pre-select State
+  const [selectedGridSize, setSelectedGridSize] = useState(15);
+  const [diagonalAllowed, setDiagonalAllowed] = useState(false);
+  const [backwardsAllowed, setBackwardsAllowed] = useState(false);
+  const [diagonalBackwardsAllowed, setDiagonalBackwardsAllowed] = useState(false);
+  const [validationMode, setValidationMode] = useState('manual');
+  const [joinInput, setJoinInput] = useState('');
+
   // Local Game State
   const [selectedRackTile, setSelectedRackTile] = useState(null);
   const [tentativePlaced, setTentativePlaced] = useState({}); // "r,c" -> { id, letter, score, isBlank }
