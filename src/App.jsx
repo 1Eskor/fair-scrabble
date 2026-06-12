@@ -26,6 +26,8 @@ const firebaseConfig = {
   appId: "1:1009249669396:web:335c0cae30b7ec79da7201",
   measurementId: "G-WFNEFFJBKQ"
 };
+
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -209,14 +211,6 @@ export default function App() {
   const [roomData, setRoomData] = useState(null);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-
-  // Lobby Pre-select State
-  const [selectedGridSize, setSelectedGridSize] = useState(15);
-  const [diagonalAllowed, setDiagonalAllowed] = useState(false);
-  const [backwardsAllowed, setBackwardsAllowed] = useState(false);
-  const [diagonalBackwardsAllowed, setDiagonalBackwardsAllowed] = useState(false);
-  const [validationMode, setValidationMode] = useState('manual');
-  const [joinInput, setJoinInput] = useState('');
 
   // Local Game State
   const [selectedRackTile, setSelectedRackTile] = useState(null);
@@ -1132,6 +1126,17 @@ export default function App() {
   // Real-time placement scoring evaluation
   const scoreReport = roomData ? getFormedWordsAndScores() : null;
 
+  // Responsive Board Calculations
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 768);
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  const isMobile = windowWidth < 768;
+  const baseCellSize = isMobile ? 24 : 38;
+  const cellSize = Math.round(baseCellSize * boardZoom);
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans flex flex-col antialiased selection:bg-amber-500 selection:text-slate-950">
 
@@ -1256,8 +1261,8 @@ export default function App() {
                         type="button"
                         onClick={() => setSelectedGridSize(opt.size)}
                         className={`p-3 rounded-xl border text-center transition flex flex-col justify-center items-center gap-1 ${selectedGridSize === opt.size
-                            ? 'bg-amber-500/20 border-amber-400 text-amber-200'
-                            : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-400'
+                          ? 'bg-amber-500/20 border-amber-400 text-amber-200'
+                          : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-400'
                           }`}
                       >
                         <span className="font-extrabold text-base">{opt.size}x{opt.size}</span>
@@ -1309,8 +1314,8 @@ export default function App() {
                       type="button"
                       onClick={() => setValidationMode('manual')}
                       className={`p-2.5 rounded-xl border text-xs font-bold transition ${validationMode === 'manual'
-                          ? 'bg-slate-800 border-amber-400 text-amber-200'
-                          : 'bg-slate-900 border-slate-800 text-slate-400'
+                        ? 'bg-slate-800 border-amber-400 text-amber-200'
+                        : 'bg-slate-900 border-slate-800 text-slate-400'
                         }`}
                     >
                       🗣️ Self-Judge Mode (Default)
@@ -1319,8 +1324,8 @@ export default function App() {
                       type="button"
                       onClick={() => setValidationMode('strict')}
                       className={`p-2.5 rounded-xl border text-xs font-bold transition ${validationMode === 'strict'
-                          ? 'bg-slate-800 border-amber-400 text-amber-200'
-                          : 'bg-slate-900 border-slate-800 text-slate-400'
+                        ? 'bg-slate-800 border-amber-400 text-amber-200'
+                        : 'bg-slate-900 border-slate-800 text-slate-400'
                         }`}
                       title="Checks placed words against official dictionary API"
                     >
@@ -1396,8 +1401,8 @@ export default function App() {
                 <div className="flex items-center gap-3">
                   {roomData.status === 'playing' ? (
                     <div className={`px-4 py-2 rounded-xl border text-sm font-bold flex items-center gap-2 ${isMyTurn
-                        ? 'bg-amber-500/20 border-amber-400 text-amber-200 animate-pulse'
-                        : 'bg-slate-900 border-slate-800 text-slate-400'
+                      ? 'bg-amber-500/20 border-amber-400 text-amber-200 animate-pulse'
+                      : 'bg-slate-900 border-slate-800 text-slate-400'
                       }`}>
                       <span className={`w-2 h-2 rounded-full ${isMyTurn ? 'bg-amber-400' : 'bg-slate-600'}`}></span>
                       {isMyTurn ? "Your Turn!" : `${roomData.players[roomData.activePlayerId]?.name || "Opponent"}'s Turn`}
@@ -1437,14 +1442,15 @@ export default function App() {
               </div>
 
               {/* Interactive Scrabble Board Display */}
-              <div className="w-full bg-slate-950 border border-slate-800 p-4 md:p-6 rounded-2xl shadow-2xl overflow-auto flex justify-center">
-                <div
-                  className="origin-top transition-transform duration-200"
-                  style={{ transform: `scale(${boardZoom})`, width: '100%', maxWidth: `${roomData.gridSize * 42}px` }}
-                >
+              <div className="w-full bg-slate-950 border border-slate-800 p-1.5 md:p-6 rounded-2xl shadow-2xl overflow-auto flex justify-start md:justify-center">
+                <div className="select-none bg-slate-900 p-1.5 md:p-2 rounded-xl">
                   <div
-                    className="grid gap-1 bg-slate-900 p-2 rounded-xl select-none"
-                    style={{ gridTemplateColumns: `repeat(${roomData.gridSize}, minmax(0, 1fr))` }}
+                    className="grid"
+                    style={{
+                      gap: isMobile ? '2px' : '4px',
+                      gridTemplateColumns: `repeat(${roomData.gridSize}, ${cellSize}px)`,
+                      gridTemplateRows: `repeat(${roomData.gridSize}, ${cellSize}px)`
+                    }}
                   >
                     {Array.from({ length: roomData.gridSize }).map((_, r) => (
                       Array.from({ length: roomData.gridSize }).map((_, c) => {
@@ -1456,7 +1462,6 @@ export default function App() {
                         // Layout styling for special squares
                         let cellBg = 'bg-slate-800 hover:bg-slate-750 border border-slate-750';
                         let cellLabel = '';
-                        let cellColorText = 'text-[9px] font-black tracking-tighter opacity-80';
 
                         if (bonus === 'TW') {
                           cellBg = 'bg-gradient-to-br from-rose-500 to-rose-600 border border-rose-400';
@@ -1469,11 +1474,9 @@ export default function App() {
                           cellLabel = 'TL';
                         } else if (bonus === 'DL') {
                           cellBg = 'bg-gradient-to-br from-cyan-400 to-cyan-500 border border-cyan-300 text-slate-950';
-                          cellColorText = 'text-[9px] font-black tracking-tighter text-slate-950';
                           cellLabel = 'DL';
                         } else if (bonus === 'star') {
                           cellBg = 'bg-gradient-to-br from-amber-400 to-amber-500 border border-amber-300 text-slate-950';
-                          cellColorText = 'text-[9px] font-black text-slate-950';
                           cellLabel = '★';
                         }
 
@@ -1487,29 +1490,30 @@ export default function App() {
                                 placeTileOnBoard(r, c);
                               }
                             }}
-                            className={`aspect-square w-full min-w-[28px] md:min-w-[34px] rounded-lg cursor-pointer flex flex-col items-center justify-center relative transition transform duration-150 shadow-sm ${cellBg}`}
+                            className={`rounded-lg cursor-pointer flex flex-col items-center justify-center relative transition transform duration-150 shadow-sm ${cellBg}`}
+                            style={{ width: `${cellSize}px`, height: `${cellSize}px` }}
                           >
                             {/* Render permanent tile */}
                             {permTile && (
-                              <div className="absolute inset-0 bg-gradient-to-br from-amber-100 to-amber-200 border-2 border-amber-300 rounded-lg text-amber-950 flex flex-col items-center justify-center font-bold shadow-md scale-95">
-                                <span className="text-sm md:text-base leading-none font-extrabold">{permTile.letter}</span>
-                                <span className="absolute bottom-0.5 right-1 text-[8px] md:text-[9px] font-semibold leading-none">{permTile.score}</span>
-                                {permTile.isBlank && <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-sky-500 rounded-full" title="Blank representation" />}
+                              <div className="absolute inset-0 bg-gradient-to-br from-amber-100 to-amber-200 border border-amber-300 rounded-lg text-amber-950 flex flex-col items-center justify-center font-bold shadow-md scale-95">
+                                <span className="leading-none font-extrabold" style={{ fontSize: `${cellSize * 0.5}px` }}>{permTile.letter}</span>
+                                <span className="absolute font-semibold leading-none" style={{ fontSize: `${cellSize * 0.28}px`, bottom: `${cellSize * 0.08}px`, right: `${cellSize * 0.08}px` }}>{permTile.score}</span>
+                                {permTile.isBlank && <span className="absolute bg-sky-500 rounded-full" style={{ top: `${cellSize * 0.08}px`, right: `${cellSize * 0.08}px`, width: `${cellSize * 0.15}px`, height: `${cellSize * 0.15}px` }} title="Blank representation" />}
                               </div>
                             )}
 
                             {/* Render tentative tile */}
                             {tempTile && (
-                              <div className="absolute inset-0 bg-gradient-to-br from-amber-200 to-amber-300 border-2 border-amber-500 rounded-lg text-amber-950 flex flex-col items-center justify-center font-extrabold shadow-lg scale-100 ring-2 ring-amber-400 ring-offset-1 ring-offset-slate-900 animate-pulse">
-                                <span className="text-sm md:text-base leading-none">{tempTile.letter}</span>
-                                <span className="absolute bottom-0.5 right-1 text-[8px] md:text-[9px] leading-none">{tempTile.score}</span>
-                                {tempTile.isBlank && <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-sky-500 rounded-full" />}
+                              <div className="absolute inset-0 bg-gradient-to-br from-amber-200 to-amber-300 border border-amber-500 rounded-lg text-amber-950 flex flex-col items-center justify-center font-extrabold shadow-lg scale-100 ring-2 ring-amber-400 ring-offset-1 ring-offset-slate-900 animate-pulse">
+                                <span className="leading-none font-extrabold" style={{ fontSize: `${cellSize * 0.5}px` }}>{tempTile.letter}</span>
+                                <span className="absolute font-semibold leading-none" style={{ fontSize: `${cellSize * 0.28}px`, bottom: `${cellSize * 0.08}px`, right: `${cellSize * 0.08}px` }}>{tempTile.score}</span>
+                                {tempTile.isBlank && <span className="absolute bg-sky-500 rounded-full" style={{ top: `${cellSize * 0.08}px`, right: `${cellSize * 0.08}px`, width: `${cellSize * 0.15}px`, height: `${cellSize * 0.15}px` }} />}
                               </div>
                             )}
 
                             {/* Render default bonus label if empty */}
                             {!permTile && !tempTile && (
-                              <span className={cellColorText}>{cellLabel}</span>
+                              <span className="font-black tracking-tighter opacity-80" style={{ fontSize: `${cellSize * 0.32}px`, color: (cellLabel === 'DL' || cellLabel === '★') ? '#0f172a' : undefined }}>{cellLabel}</span>
                             )}
                           </div>
                         );
@@ -1528,7 +1532,7 @@ export default function App() {
                     {exchangeMode ? "Select Tiles to Exchange" : "Your Tile Rack"}
                   </span>
 
-                  <div className="flex items-center gap-2 md:gap-3 bg-slate-900 p-3 rounded-2xl border border-slate-800 shadow-inner">
+                  <div className="flex items-center gap-2 md:gap-3 bg-slate-900 p-3 rounded-2xl border border-slate-800 shadow-inner max-w-full overflow-x-auto">
                     {me?.rack.map((tile, idx) => {
                       // Check if tile is tentatively placed on the board right now
                       const isPlaced = Object.values(tentativePlaced).some(t => t.id === tile.id);
@@ -1539,16 +1543,16 @@ export default function App() {
                           key={tile.id}
                           disabled={isPlaced && !exchangeMode}
                           onClick={() => selectRackTile(idx)}
-                          className={`w-10 h-12 md:w-12 md:h-14 rounded-xl flex flex-col items-center justify-center relative font-extrabold shadow transition transform active:scale-95 ${isPlaced
-                              ? 'opacity-20 cursor-not-allowed bg-slate-800 border-dashed border border-slate-700'
-                              : isSelectedExchange
-                                ? 'bg-gradient-to-br from-rose-500 to-rose-600 border-2 border-rose-300 text-white scale-105'
-                                : selectedRackTile === idx
-                                  ? 'bg-gradient-to-br from-amber-200 to-amber-300 border-2 border-amber-500 text-slate-950 -translate-y-2 ring-4 ring-amber-400/30'
-                                  : 'bg-gradient-to-br from-amber-100 to-amber-200 border border-amber-300 hover:from-amber-200 hover:to-amber-300 text-slate-950'
+                          className={`w-10 h-12 md:w-12 md:h-14 shrink-0 rounded-xl flex flex-col items-center justify-center relative font-extrabold shadow transition transform active:scale-95 ${isPlaced
+                            ? 'opacity-20 cursor-not-allowed bg-slate-800 border-dashed border border-slate-700'
+                            : isSelectedExchange
+                              ? 'bg-gradient-to-br from-rose-500 to-rose-600 border-2 border-rose-300 text-white scale-105'
+                              : selectedRackTile === idx
+                                ? 'bg-gradient-to-br from-amber-200 to-amber-300 border-2 border-amber-500 text-slate-950 -translate-y-2 ring-4 ring-amber-400/30'
+                                : 'bg-gradient-to-br from-amber-100 to-amber-200 border border-amber-300 hover:from-amber-200 hover:to-amber-300 text-slate-950'
                             }`}
                         >
-                          <span className="text-base md:text-lg leading-none">{tile.letter === '_' ? 'Blank' : tile.letter}</span>
+                          <span className="text-base md:text-lg leading-none">{tile.letter === '_' ? '' : tile.letter}</span>
                           <span className="absolute bottom-1 right-1.5 text-[9px] md:text-[10px] leading-none opacity-80">{tile.score}</span>
 
                           {/* Indicator for blanks */}
@@ -1673,8 +1677,8 @@ export default function App() {
 
                   {/* Current Active Player */}
                   <div className={`p-4 rounded-xl border flex items-center justify-between transition ${roomData.activePlayerId === user.uid
-                      ? 'bg-amber-500/10 border-amber-500/30 ring-1 ring-amber-500/20'
-                      : 'bg-slate-900 border-slate-800'
+                    ? 'bg-amber-500/10 border-amber-500/30 ring-1 ring-amber-500/20'
+                    : 'bg-slate-900 border-slate-800'
                     }`}>
                     <div>
                       <div className="flex items-center gap-2">
@@ -1692,8 +1696,8 @@ export default function App() {
                   {/* Opponent Player */}
                   {opponent ? (
                     <div className={`p-4 rounded-xl border flex items-center justify-between transition ${roomData.activePlayerId === opponent.uid
-                        ? 'bg-amber-500/10 border-amber-500/30 ring-1 ring-amber-500/20'
-                        : 'bg-slate-900 border-slate-800'
+                      ? 'bg-amber-500/10 border-amber-500/30 ring-1 ring-amber-500/20'
+                      : 'bg-slate-900 border-slate-800'
                       }`}>
                       <div>
                         <div className="flex items-center gap-2">
@@ -1760,8 +1764,8 @@ export default function App() {
 
                 {dictResult && (
                   <div className={`p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between ${dictResult.valid
-                      ? 'bg-emerald-950/50 border border-emerald-800/60 text-emerald-300'
-                      : 'bg-rose-950/50 border border-rose-800/60 text-rose-300'
+                    ? 'bg-emerald-950/50 border border-emerald-800/60 text-emerald-300'
+                    : 'bg-rose-950/50 border border-rose-800/60 text-rose-300'
                     }`}>
                     <span>"{dictResult.word.toUpperCase()}" {dictResult.valid ? 'is a VALID English Word ✅' : 'is NOT in Dictionary ❌'}</span>
                   </div>
@@ -1809,8 +1813,8 @@ export default function App() {
                             </span>
                           </div>
                           <div className={`mt-0.5 max-w-[85%] px-3 py-1.5 rounded-2xl text-xs leading-normal ${isMe
-                              ? 'bg-amber-500 text-slate-950 rounded-tr-none'
-                              : 'bg-slate-800 text-slate-200 rounded-tl-none'
+                            ? 'bg-amber-500 text-slate-950 rounded-tr-none'
+                            : 'bg-slate-800 text-slate-200 rounded-tl-none'
                             }`}>
                             {msg.text}
                           </div>
@@ -1883,6 +1887,54 @@ export default function App() {
         </div>
       )}
 
+      {/* Lobby Pre-select State Holders (Kept at bottom block of file for simplicity) */}
+      {(() => {
+        const [selectedGridSize, setSelectedGridSize] = useState(15);
+        const [diagonalAllowed, setDiagonalAllowed] = useState(false);
+        const [backwardsAllowed, setBackwardsAllowed] = useState(false);
+        const [diagonalBackwardsAllowed, setDiagonalBackwardsAllowed] = useState(false);
+        const [validationMode, setValidationMode] = useState('manual');
+        const [joinInput, setJoinInput] = useState('');
+
+        // Exposing these states inside the global window scope to bypass React block scope issues
+        useEffect(() => {
+          window._setLobbyState = {
+            selectedGridSize, setSelectedGridSize,
+            diagonalAllowed, setDiagonalAllowed,
+            backwardsAllowed, setBackwardsAllowed,
+            diagonalBackwardsAllowed, setDiagonalBackwardsAllowed,
+            validationMode, setValidationMode,
+            joinInput, setJoinInput
+          };
+        }, [selectedGridSize, diagonalAllowed, backwardsAllowed, diagonalBackwardsAllowed, validationMode, joinInput]);
+      })()}
+
     </div>
   );
 }
+
+// Helper wrapper to safely let outer scoped variables interact
+let extSetGridSize = 15;
+let extSetDiag = false;
+let extSetBack = false;
+let extSetDiagBack = false;
+let extSetVal = 'manual';
+let extSetJoin = '';
+
+const setSelectedGridSize = (val) => { if (window._setLobbyState) { window._setLobbyState.setSelectedGridSize(val); } };
+const selectedGridSize = typeof window !== 'undefined' && window._setLobbyState ? window._setLobbyState.selectedGridSize : 15;
+
+const setDiagonalAllowed = (val) => { if (window._setLobbyState) { window._setLobbyState.setDiagonalAllowed(val); } };
+const diagonalAllowed = typeof window !== 'undefined' && window._setLobbyState ? window._setLobbyState.diagonalAllowed : false;
+
+const setBackwardsAllowed = (val) => { if (window._setLobbyState) { window._setLobbyState.setBackwardsAllowed(val); } };
+const backwardsAllowed = typeof window !== 'undefined' && window._setLobbyState ? window._setLobbyState.backwardsAllowed : false;
+
+const setDiagonalBackwardsAllowed = (val) => { if (window._setLobbyState) { window._setLobbyState.setDiagonalBackwardsAllowed(val); } };
+const diagonalBackwardsAllowed = typeof window !== 'undefined' && window._setLobbyState ? window._setLobbyState.diagonalBackwardsAllowed : false;
+
+const setValidationMode = (val) => { if (window._setLobbyState) { window._setLobbyState.setValidationMode(val); } };
+const validationMode = typeof window !== 'undefined' && window._setLobbyState ? window._setLobbyState.validationMode : 'manual';
+
+const setJoinInput = (val) => { if (window._setLobbyState) { window._setLobbyState.setJoinInput(val); } };
+const joinInput = typeof window !== 'undefined' && window._setLobbyState ? window._setLobbyState.joinInput : '';
