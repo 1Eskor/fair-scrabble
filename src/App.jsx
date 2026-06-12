@@ -811,21 +811,31 @@ export default function App() {
       }
     } else {
       // Primary axis
-      axesToScan.push(normalizeDirection(direction));
-      // Scan all potential perpendicular crossing axes for each placed tile
-      const possibleDirs = [
-        { dr: 0, dc: 1 }, // Horizontal
-        { dr: 1, dc: 0 }  // Vertical
-      ];
-      if (roomData.diagonalAllowed || roomData.diagonalBackwardsAllowed) {
-        possibleDirs.push({ dr: 1, dc: 1 });
-        possibleDirs.push({ dr: -1, dc: 1 });
+      const normPrimary = normalizeDirection(direction);
+      axesToScan.push(normPrimary);
+
+      // Determine if the primary axis is diagonal
+      const isPrimaryDiagonal = Math.abs(normPrimary.dr) === 1 && Math.abs(normPrimary.dc) === 1;
+
+      // Select candidate crossing axes based on the primary axis type (orthogonal vs diagonal)
+      let candidateDirs = [];
+      if (isPrimaryDiagonal) {
+        // Diagonal play: perpendicular crossing axis is the other diagonal
+        candidateDirs = [
+          { dr: 1, dc: 1 },
+          { dr: -1, dc: 1 }
+        ];
+      } else {
+        // Orthogonal (horizontal/vertical) play: perpendicular crossing axis is the other orthogonal axis
+        candidateDirs = [
+          { dr: 0, dc: 1 },
+          { dr: 1, dc: 0 }
+        ];
       }
 
       coords.forEach(co => {
-        possibleDirs.forEach(dir => {
+        candidateDirs.forEach(dir => {
           const normDir = normalizeDirection(dir);
-          const normPrimary = normalizeDirection(direction);
           const isPrimaryDir = (normDir.dr === normPrimary.dr && normDir.dc === normPrimary.dc);
           if (!isPrimaryDir) {
             axesToScan.push({ dr: normDir.dr, dc: normDir.dc, fromCoord: co });
@@ -886,6 +896,37 @@ export default function App() {
         }
       }
     });
+
+    // Filter accidental cross-system words for single tile plays
+    if (coords.length === 1 && formedWordsList.length > 0) {
+      // Find the main word (longest word)
+      let mainWord = null;
+      let maxLen = 0;
+      formedWordsList.forEach(w => {
+        if (w.forwardWord.length > maxLen) {
+          maxLen = w.forwardWord.length;
+          mainWord = w;
+        }
+      });
+
+      if (mainWord) {
+        // Tie-breaker: prefer orthogonal if there is a tie for longest word
+        const longestWords = formedWordsList.filter(w => w.forwardWord.length === maxLen);
+        const hasOrthogonalLongest = longestWords.some(w => !(Math.abs(w.axis.dr) === 1 && Math.abs(w.axis.dc) === 1));
+        
+        const isMainDiagonal = hasOrthogonalLongest ? false : (Math.abs(mainWord.axis.dr) === 1 && Math.abs(mainWord.axis.dc) === 1);
+        
+        // Keep only words on the same system (diagonal vs orthogonal)
+        const filteredList = formedWordsList.filter(w => {
+          const isDiag = Math.abs(w.axis.dr) === 1 && Math.abs(w.axis.dc) === 1;
+          return isMainDiagonal ? isDiag : !isDiag;
+        });
+
+        // Mutate formedWordsList to reflect the filtered items
+        formedWordsList.length = 0;
+        formedWordsList.push(...filteredList);
+      }
+    }
 
     // Bingo calculation: Did player use their entire rack?
     let bingoBonus = 0;
