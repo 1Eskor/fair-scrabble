@@ -679,14 +679,15 @@ export default function App() {
     }
 
     // Continuity Check: Ensure no empty spaces between the extremes of your line
-    // Find min and max projection coordinates along vector
-    const projection = c => c.r * udr + c.c * udc;
-    const sortedCoords = [...coords].sort((a, b) => projection(a) - projection(b));
-    const minProj = projection(sortedCoords[0]);
-    const maxProj = projection(sortedCoords[sortedCoords.length - 1]);
+    // Find min and max step indices along the line
+    const getStepIndex = (c) => {
+      return udr !== 0 ? (c.r - r0) / udr : (c.c - c0) / udc;
+    };
+    const sortedCoords = [...coords].sort((a, b) => getStepIndex(a) - getStepIndex(b));
+    const minProj = getStepIndex(sortedCoords[0]);
+    const maxProj = getStepIndex(sortedCoords[sortedCoords.length - 1]);
 
     for (let p = minProj; p <= maxProj; p++) {
-      // Find cells belonging to this projected index
       const steps = p - minProj;
       const stepRow = sortedCoords[0].r + steps * udr;
       const stepCol = sortedCoords[0].c + steps * udc;
@@ -787,18 +788,24 @@ export default function App() {
     } else {
       // Primary axis
       axesToScan.push(direction);
-      // For each placed tile, we look at the perpendicular axes
+      // Scan all potential perpendicular crossing axes for each placed tile
+      const possibleDirs = [
+        { dr: 0, dc: 1 }, // Horizontal
+        { dr: 1, dc: 0 }  // Vertical
+      ];
+      if (roomData.diagonalAllowed || roomData.diagonalBackwardsAllowed) {
+        possibleDirs.push({ dr: 1, dc: 1 });
+        possibleDirs.push({ dr: 1, dc: -1 });
+      }
+
       coords.forEach(co => {
-        if (direction.dr === 0) {
-          // Primary is Horizontal. Perpendicular is Vertical.
-          axesToScan.push({ dr: 1, dc: 0, fromCoord: co });
-        } else if (direction.dc === 0) {
-          // Primary is Vertical. Perpendicular is Horizontal.
-          axesToScan.push({ dr: 0, dc: 1, fromCoord: co });
-        } else {
-          // Primary is Diagonal. Perpendicular is the opposite Diagonal.
-          axesToScan.push({ dr: -direction.dc, dc: direction.dr, fromCoord: co });
-        }
+        possibleDirs.forEach(dir => {
+          const isPrimaryDir = (dir.dr === direction.dr && dir.dc === direction.dc) ||
+                               (dir.dr === -direction.dr && dir.dc === -direction.dc);
+          if (!isPrimaryDir) {
+            axesToScan.push({ dr: dir.dr, dc: dir.dc, fromCoord: co });
+          }
+        });
       });
     }
 
