@@ -1073,49 +1073,9 @@ export default function App() {
       }
     }
 
-    // --- IDENTIFY INTERSECTION GROUPS ---
-    // Rule: When an axis is intersecting (e.g. Diagonal crossing Horizontal), 
-    // there are 2 connecting tiles (the newly placed tiles before and after the shared existing tile).
-    // Only 1 of those 2 connecting tiles needs to form a valid cross-word.
-    const intersectionGroups = [];
-    if (!isFirstMove && coords.length > 1) {
-      let mainWord = null;
-      const mainAxis = normalizeDirection(direction);
-      mainWord = formedWordsList.find(w => w.axis.dr === mainAxis.dr && w.axis.dc === mainAxis.dc);
-      
-      if (mainWord && mainWord.cells) {
-        for (let i = 1; i < mainWord.cells.length - 1; i++) {
-          const cell = mainWord.cells[i];
-          if (!cell.isNew) { // This is a shared tile (the intersection point)
-            const prevCell = mainWord.cells[i-1];
-            const nextCell = mainWord.cells[i+1];
-            if (prevCell && prevCell.isNew && nextCell && nextCell.isNew) {
-              const isAdjacent = (r1, c1, r2, c2) => Math.abs(r1 - r2) <= 1 && Math.abs(c1 - c2) <= 1;
-              // Left connecting words: cross-words containing prevCell AND an existing tile adjacent to the shared cell
-              const leftWords = formedWordsList.filter(w => 
-                w !== mainWord && 
-                w.cells.some(c => c.r === prevCell.r && c.c === prevCell.c) &&
-                w.cells.some(c => !c.isNew && isAdjacent(c.r, c.c, cell.r, cell.c))
-              );
-              // Right connecting words: cross-words containing nextCell AND an existing tile adjacent to the shared cell
-              const rightWords = formedWordsList.filter(w => 
-                w !== mainWord && 
-                w.cells.some(c => c.r === nextCell.r && c.c === nextCell.c) &&
-                w.cells.some(c => !c.isNew && isAdjacent(c.r, c.c, cell.r, cell.c))
-              );
-              if (leftWords.length > 0 && rightWords.length > 0) {
-                intersectionGroups.push({ leftWords, rightWords });
-              }
-            }
-          }
-        }
-      }
-    }
-
     return {
       valid: true,
       words: formedWordsList,
-      intersectionGroups,
       bingoBonus,
       totalScore: formedWordsList.reduce((sum, w) => sum + w.score, 0) + bingoBonus
     };
@@ -1193,29 +1153,63 @@ export default function App() {
       const isSingleTilePlay = Object.keys(tentativePlaced).length === 1;
       const hasAtLeastOneValidWord = Array.from(wordValidity.values()).some(v => v);
 
+      // 1. Identify the main word
+      let mainWord = null;
+      if (isSingleTilePlay) {
+        let maxLen = 0;
+        scoreData.words.forEach(w => {
+          if (w.forwardWord.length > maxLen) {
+            maxLen = w.forwardWord.length;
+            mainWord = w;
+          }
+        });
+      } else {
+        const coords = Object.keys(tentativePlaced).map(k => tentativePlaced[k]);
+        if (coords.length > 1) {
+          // Identify placement direction
+          const [r0, c0] = Object.keys(tentativePlaced)[0].split(',').map(Number);
+          const [r1, c1] = Object.keys(tentativePlaced)[1].split(',').map(Number);
+          const dr = r1 - r0;
+          const dc = c1 - c0;
+          const getGcd = (a, b) => b === 0 ? Math.abs(a) : getGcd(b, a % b);
+          const stepGcd = getGcd(dr, dc);
+          const rawDir = { dr: dr / stepGcd, dc: dc / stepGcd };
+
+          const normalizeDirection = (dir) => {
+            if (!dir) return dir;
+            if (dir.dc > 0) return dir;
+            if (dir.dc < 0) return { dr: -dir.dr, dc: -dir.dc };
+            if (dir.dr > 0) return dir;
+            return { dr: -dir.dr, dc: -dir.dc };
+          };
+          const mainAxis = normalizeDirection(rawDir);
+          mainWord = scoreData.words.find(w => w.axis.dr === mainAxis.dr && w.axis.dc === mainAxis.dc);
+        }
+      }
+
+      // 2. Separate cross words
+      const crossWords = scoreData.words.filter(w => w !== mainWord);
+      const isMainWordValid = mainWord ? wordValidity.get(mainWord) : true;
+      const hasValidCrossWord = crossWords.some(w => wordValidity.get(w));
+
       for (const w of scoreData.words) {
         if (!wordValidity.get(w)) {
           let isForgiven = false;
 
-          // Single tile rule: If you play a single letter and it forms multiple words, 
-          // it only needs to form at least ONE valid word to be allowed.
-          if (isSingleTilePlay && hasAtLeastOneValidWord) {
-            isForgiven = true;
-          }
-
-          // Check if this invalid word is part of an intersection group and can be forgiven
-          if (!isForgiven && scoreData.intersectionGroups) {
-            for (const group of scoreData.intersectionGroups) {
-              if (group.leftWords.includes(w)) {
-                if (group.rightWords.every(rw => wordValidity.get(rw))) {
-                  isForgiven = true;
-                  break;
-                }
-              } else if (group.rightWords.includes(w)) {
-                if (group.leftWords.every(lw => wordValidity.get(lw))) {
-                  isForgiven = true;
-                  break;
-                }
+          if (isSingleTilePlay) {
+            // Single tile rule: If you play a single letter, it only needs to form at least ONE valid word.
+            if (hasAtLeastOneValidWord) {
+              isForgiven = true;
+            }
+          } else {
+            if (w === mainWord) {
+              // The main word of a multi-tile play CANNOT be forgiven. It MUST be valid.
+              isForgiven = false;
+            } else {
+              // It's an invalid cross-word.
+              // Forgive it if the main word is valid AND there is at least one valid cross-word!
+              if (isMainWordValid && hasValidCrossWord) {
+                isForgiven = true;
               }
             }
           }
