@@ -892,24 +892,15 @@ export default function App() {
       // Determine if the primary axis is diagonal
       const isPrimaryDiagonal = Math.abs(normPrimary.dr) === 1 && Math.abs(normPrimary.dc) === 1;
 
-      // Select candidate crossing axes based on the primary axis type (orthogonal vs diagonal)
-      let candidateDirs = [];
-      if (isPrimaryDiagonal) {
-        // Diagonal play: scan the other diagonal AND both orthogonal axes (Horizontal/Vertical)
-        // This ensures parallel diagonal plays (which form orthogonal cross-words) are caught.
-        candidateDirs = [
-          { dr: 1, dc: 1 },
-          { dr: -1, dc: 1 },
-          { dr: 0, dc: 1 },
-          { dr: 1, dc: 0 }
-        ];
-      } else {
-        // Orthogonal (horizontal/vertical) play: perpendicular crossing axis is the other orthogonal axis.
-        // We explicitly DO NOT scan diagonals here, so horizontal plays don't accidentally score diagonal adjacencies.
-        candidateDirs = [
-          { dr: 0, dc: 1 },
-          { dr: 1, dc: 0 }
-        ];
+      // Select candidate crossing axes based on the room rules
+      let candidateDirs = [
+        { dr: 0, dc: 1 },
+        { dr: 1, dc: 0 }
+      ];
+      if (roomData.diagonalAllowed || roomData.diagonalBackwardsAllowed) {
+        // If diagonals are enabled, any placed tile (even orthogonal plays) can form diagonal cross-words!
+        candidateDirs.push({ dr: 1, dc: 1 });
+        candidateDirs.push({ dr: -1, dc: 1 });
       }
 
       coords.forEach(co => {
