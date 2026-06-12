@@ -105,27 +105,27 @@ function runValidationTest(scenarioName, board, tentativePlaced, direction, isFi
   if (!isFirstMove && coords.length > 1) {
     const mainAxis = normalizeDirection(direction);
     const mainWord = formedWordsList.find(w => w.axis.dr === mainAxis.dr && w.axis.dc === mainAxis.dc);
-    
+
     if (mainWord && mainWord.cells) {
       for (let i = 1; i < mainWord.cells.length - 1; i++) {
         const cell = mainWord.cells[i];
         if (!cell.isNew) {
-          const prevCell = mainWord.cells[i-1];
-          const nextCell = mainWord.cells[i+1];
+          const prevCell = mainWord.cells[i - 1];
+          const nextCell = mainWord.cells[i + 1];
           if (prevCell && prevCell.isNew && nextCell && nextCell.isNew) {
             const isAdjacent = (r1, c1, r2, c2) => Math.abs(r1 - r2) <= 1 && Math.abs(c1 - c2) <= 1;
-            const leftWords = formedWordsList.filter(w => 
-              w !== mainWord && 
+            const leftWords = formedWordsList.filter(w =>
+              w !== mainWord &&
               w.cells.some(c => c.r === prevCell.r && c.c === prevCell.c) &&
               w.cells.some(c => !c.isNew && isAdjacent(c.r, c.c, cell.r, cell.c))
             );
-            const rightWords = formedWordsList.filter(w => 
-              w !== mainWord && 
+            const rightWords = formedWordsList.filter(w =>
+              w !== mainWord &&
               w.cells.some(c => c.r === nextCell.r && c.c === nextCell.c) &&
               w.cells.some(c => !c.isNew && isAdjacent(c.r, c.c, cell.r, cell.c))
             );
             if (leftWords.length > 0 && rightWords.length > 0) {
-              intersectionGroups.push({ leftWords: leftWords.map(w=>w.forwardWord), rightWords: rightWords.map(w=>w.forwardWord) });
+              intersectionGroups.push({ leftWords: leftWords.map(w => w.forwardWord), rightWords: rightWords.map(w => w.forwardWord) });
             }
           }
         }

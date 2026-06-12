@@ -1047,7 +1047,12 @@ export default function App() {
 
           const mainAxisNorm = normalizeDirection(mainWord.axis);
 
-          for (const mc of mainWord.cells) {
+          // Rule 2.1: Main Axis Privilege
+          // H or V plays do not require a cross-axis bridge. Only diagonals do.
+          const isDiagonal = mainAxisNorm.dr !== 0 && mainAxisNorm.dc !== 0;
+          
+          if (isDiagonal) {
+            for (const mc of mainWord.cells) {
             for (const dir of possibleDirs) {
               const normDir = normalizeDirection(dir);
               const isDifferentAxis = (normDir.dr !== mainAxisNorm.dr || normDir.dc !== mainAxisNorm.dc);
@@ -1069,9 +1074,10 @@ export default function App() {
               error: `2-Axis Rule: The ${mainWordLen}-letter main word "${mainWord.forwardWord}" must connect to at least one word on a different axis.`
             };
           }
-        }
-      }
-    }
+        } // end if (isDiagonal)
+        } // end if (mainWordLen >= 3)
+      } // end if (mainWord)
+    } // end if (formedWordsList.length > 0 && !isFirstMove)
 
     // --- DICTIONARY VALIDATION & FORGIVENESS ---
     const finalWordsList = [];
