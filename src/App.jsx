@@ -245,6 +245,7 @@ export default function App() {
   const [dictChecking, setDictChecking] = useState(false);
 
   const chatContainerRef = useRef(null);
+  const prevChatLengthRef = useRef(0);
 
   // --- SIGN IN AND RUN AUTH (RULE 3) ---
   useEffect(() => {
@@ -297,11 +298,15 @@ export default function App() {
     return () => unsubscribe();
   }, [user, roomId]);
 
-  // Scroll chat to bottom
+  // Scroll chat to bottom only when a new message is actually added
   useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    const currentLength = roomData?.chat?.length || 0;
+    if (currentLength > prevChatLengthRef.current) {
+      if (chatContainerRef.current) {
+        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      }
     }
+    prevChatLengthRef.current = currentLength;
   }, [roomData?.chat?.length]);
 
   // Save nickname
