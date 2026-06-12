@@ -17,7 +17,15 @@ import {
 } from 'firebase/firestore';
 
 // --- FIREBASE CONFIGURATION ---
-const firebaseConfig = JSON.parse(__firebase_config);
+const firebaseConfig = {
+  apiKey: "AIzaSyBm8sYdEMIP9xr2jFxlek_3SJeGaRz-L5U",
+  authDomain: "fair-scrabble.firebaseapp.com",
+  projectId: "fair-scrabble",
+  storageBucket: "fair-scrabble.firebasestorage.app",
+  messagingSenderId: "1009249669396",
+  appId: "1:1009249669396:web:335c0cae30b7ec79da7201",
+  measurementId: "G-WFNEFFJBKQ"
+};
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
