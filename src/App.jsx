@@ -1073,11 +1073,74 @@ export default function App() {
       }
     }
 
+    // --- DICTIONARY VALIDATION & FORGIVENESS ---
+    const finalWordsList = [];
+    if (roomData.validationMode === 'strict') {
+      const wordValidity = new Map();
+      for (const w of formedWordsList) {
+        const isValid = checkWordLocal(w.forwardWord) ||
+          (roomData.backwardsAllowed && checkWordLocal(w.backwardWord)) ||
+          (roomData.diagonalBackwardsAllowed && checkWordLocal(w.backwardWord));
+        wordValidity.set(w, isValid);
+      }
+
+      const isSingleTilePlay = coords.length === 1;
+      const hasAtLeastOneValidWord = Array.from(wordValidity.values()).some(v => v);
+
+      let mainWord = null;
+      if (isSingleTilePlay) {
+        let maxLen = 0;
+        formedWordsList.forEach(w => {
+          if (w.forwardWord.length > maxLen) {
+            maxLen = w.forwardWord.length;
+            mainWord = w;
+          }
+        });
+      } else if (coords.length > 1) {
+        const mainAxis = normalizeDirection(direction);
+        mainWord = formedWordsList.find(w => w.axis.dr === mainAxis.dr && w.axis.dc === mainAxis.dc);
+      }
+
+      const crossWords = formedWordsList.filter(w => w !== mainWord);
+      const isMainWordValid = mainWord ? wordValidity.get(mainWord) : true;
+      const hasValidCrossWord = crossWords.some(w => wordValidity.get(w));
+
+      for (const w of formedWordsList) {
+        if (!wordValidity.get(w)) {
+          let isForgiven = false;
+
+          if (isSingleTilePlay) {
+            if (hasAtLeastOneValidWord) isForgiven = true;
+          } else {
+            if (w === mainWord) {
+              isForgiven = false; // Main word must be valid
+            } else {
+              if (isMainWordValid && hasValidCrossWord) {
+                isForgiven = true;
+              }
+            }
+          }
+
+          if (!isForgiven) {
+            return {
+              words: [],
+              error: `"${w.forwardWord}" was not recognized as a valid English word! Play rejected.`
+            };
+          }
+          // If forgiven, we omit it from finalWordsList so it receives no points
+        } else {
+          finalWordsList.push(w);
+        }
+      }
+    } else {
+      finalWordsList.push(...formedWordsList);
+    }
+
     return {
       valid: true,
-      words: formedWordsList,
+      words: finalWordsList,
       bingoBonus,
-      totalScore: formedWordsList.reduce((sum, w) => sum + w.score, 0) + bingoBonus
+      totalScore: finalWordsList.reduce((sum, w) => sum + w.score, 0) + bingoBonus
     };
   };
 
@@ -1138,88 +1201,6 @@ export default function App() {
     if (scoreData.words.length === 0) {
       setError("Placed letters must form at least one valid word.");
       return;
-    }
-
-    // Handle Dictionary Validation if in Strict mode
-    if (roomData.validationMode === 'strict') {
-      const wordValidity = new Map();
-      for (const w of scoreData.words) {
-        const isValid = checkWordLocal(w.forwardWord) ||
-          (roomData.backwardsAllowed && checkWordLocal(w.backwardWord)) ||
-          (roomData.diagonalBackwardsAllowed && checkWordLocal(w.backwardWord));
-        wordValidity.set(w, isValid);
-      }
-
-      const isSingleTilePlay = Object.keys(tentativePlaced).length === 1;
-      const hasAtLeastOneValidWord = Array.from(wordValidity.values()).some(v => v);
-
-      // 1. Identify the main word
-      let mainWord = null;
-      if (isSingleTilePlay) {
-        let maxLen = 0;
-        scoreData.words.forEach(w => {
-          if (w.forwardWord.length > maxLen) {
-            maxLen = w.forwardWord.length;
-            mainWord = w;
-          }
-        });
-      } else {
-        const coords = Object.keys(tentativePlaced).map(k => tentativePlaced[k]);
-        if (coords.length > 1) {
-          // Identify placement direction
-          const [r0, c0] = Object.keys(tentativePlaced)[0].split(',').map(Number);
-          const [r1, c1] = Object.keys(tentativePlaced)[1].split(',').map(Number);
-          const dr = r1 - r0;
-          const dc = c1 - c0;
-          const getGcd = (a, b) => b === 0 ? Math.abs(a) : getGcd(b, a % b);
-          const stepGcd = getGcd(dr, dc);
-          const rawDir = { dr: dr / stepGcd, dc: dc / stepGcd };
-
-          const normalizeDirection = (dir) => {
-            if (!dir) return dir;
-            if (dir.dc > 0) return dir;
-            if (dir.dc < 0) return { dr: -dir.dr, dc: -dir.dc };
-            if (dir.dr > 0) return dir;
-            return { dr: -dir.dr, dc: -dir.dc };
-          };
-          const mainAxis = normalizeDirection(rawDir);
-          mainWord = scoreData.words.find(w => w.axis.dr === mainAxis.dr && w.axis.dc === mainAxis.dc);
-        }
-      }
-
-      // 2. Separate cross words
-      const crossWords = scoreData.words.filter(w => w !== mainWord);
-      const isMainWordValid = mainWord ? wordValidity.get(mainWord) : true;
-      const hasValidCrossWord = crossWords.some(w => wordValidity.get(w));
-
-      for (const w of scoreData.words) {
-        if (!wordValidity.get(w)) {
-          let isForgiven = false;
-
-          if (isSingleTilePlay) {
-            // Single tile rule: If you play a single letter, it only needs to form at least ONE valid word.
-            if (hasAtLeastOneValidWord) {
-              isForgiven = true;
-            }
-          } else {
-            if (w === mainWord) {
-              // The main word of a multi-tile play CANNOT be forgiven. It MUST be valid.
-              isForgiven = false;
-            } else {
-              // It's an invalid cross-word.
-              // Forgive it if the main word is valid AND there is at least one valid cross-word!
-              if (isMainWordValid && hasValidCrossWord) {
-                isForgiven = true;
-              }
-            }
-          }
-
-          if (!isForgiven) {
-            setError(`"${w.forwardWord}" was not recognized as a valid English word! Play rejected.`);
-            return;
-          }
-        }
-      }
     }
 
     // Success! Update Firestore room
