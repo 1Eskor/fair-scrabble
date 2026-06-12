@@ -919,16 +919,38 @@ export default function App() {
       if (mainWord) {
         const mainWordLen = mainWord.forwardWord.length;
         if (mainWordLen >= 3) {
-          // Check if at least one cell of mainWord is shared with another word on a different axis
-          const hasCrossAxisConnection = formedWordsList.some(w => {
-            const isDifferentAxis = (w.axis.dr !== mainWord.axis.dr || w.axis.dc !== mainWord.axis.dc);
-            if (!isDifferentAxis) return false;
+          // Check if at least one cell of mainWord is shared with another word on a different axis.
+          // This other word could either be a newly formed word (in formedWordsList)
+          // or an existing word on the board.
+          let hasCrossAxisConnection = false;
 
-            const sharesCell = w.cells.some(wc => 
-              mainWord.cells.some(mc => mc.r === wc.r && mc.c === wc.c)
-            );
-            return sharesCell;
-          });
+          // Define all possible direction vectors normalized
+          const possibleDirs = [
+            { dr: 0, dc: 1 }, // Horizontal
+            { dr: 1, dc: 0 }  // Vertical
+          ];
+          if (roomData.diagonalAllowed || roomData.diagonalBackwardsAllowed) {
+            possibleDirs.push({ dr: 1, dc: 1 });
+            possibleDirs.push({ dr: -1, dc: 1 });
+          }
+
+          const mainAxisNorm = normalizeDirection(mainWord.axis);
+
+          for (const mc of mainWord.cells) {
+            for (const dir of possibleDirs) {
+              const normDir = normalizeDirection(dir);
+              const isDifferentAxis = (normDir.dr !== mainAxisNorm.dr || normDir.dc !== mainAxisNorm.dc);
+              if (!isDifferentAxis) continue;
+
+              // Traverse word on this different axis starting from cell mc
+              const wordCells = traverseWord(mc.r, mc.c, normDir.dr, normDir.dc);
+              if (wordCells.length >= 2) {
+                hasCrossAxisConnection = true;
+                break;
+              }
+            }
+            if (hasCrossAxisConnection) break;
+          }
 
           if (!hasCrossAxisConnection) {
             return {
