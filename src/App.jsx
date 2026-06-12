@@ -212,6 +212,15 @@ export default function App() {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  // Theme State ('dark' | 'light')
+  const [theme, setTheme] = useState(() => localStorage.getItem('scrabble_theme') || 'dark');
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    localStorage.setItem('scrabble_theme', nextTheme);
+  };
+
   // Lobby Pre-select State
   const [selectedGridSize, setSelectedGridSize] = useState(15);
   const [diagonalAllowed, setDiagonalAllowed] = useState(false);
@@ -1161,43 +1170,71 @@ export default function App() {
   const baseCellSize = isMobile ? 24 : 38;
   const cellSize = Math.round(baseCellSize * boardZoom);
 
+  const isDark = theme === 'dark';
+
   return (
-    <div className="min-h-screen bg-[#0e1013] text-[#e2e8f0] font-sans flex flex-col antialiased selection:bg-[#2a2e37] selection:text-slate-950">
+    <div className={`min-h-screen font-sans flex flex-col antialiased transition-colors duration-200 ${
+      isDark 
+        ? 'bg-[#0e1013] text-[#e2e8f0] selection:bg-[#2a2e37] selection:text-slate-950' 
+        : 'bg-[#f8fafc] text-[#1e293b] selection:bg-slate-200 selection:text-slate-900'
+    }`}>
 
       {/* --- HEADER --- */}
-      <header className="bg-[#15181d] border-b border-[#21252d] shadow-xl py-4 px-6 sticky top-0 z-30">
+      <header className={`border-b shadow-xl py-4 px-6 sticky top-0 z-30 transition-colors duration-200 ${
+        isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+      }`}>
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
 
           {/* Logo & Heading */}
           <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-[#2a2e37] to-[#343944] border border-[#3e4350] text-slate-950 font-black text-2xl h-10 w-10 flex items-center justify-center rounded-lg shadow-md tracking-wider">
+            <div className="bg-gradient-to-br from-[#e3cb98] to-[#d7be8a] border border-[#bfa573] text-[#2d2008] font-black text-2xl h-10 w-10 flex items-center justify-center rounded-lg shadow-md tracking-wider">
               S
             </div>
             <div>
-              <h1 className="font-extrabold text-lg md:text-xl text-slate-200 leading-tight">FairScrabble Live</h1>
-              <p className="text-xs text-slate-400">100% Even Tile Distribution & Multi-Directions</p>
+              <h1 className={`font-extrabold text-lg md:text-xl leading-tight transition-colors duration-200 ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>FairScrabble Live</h1>
+              <p className={`text-xs transition-colors duration-200 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>100% Even Tile Distribution & Multi-Directions</p>
             </div>
           </div>
 
-          {/* Nickname and Lobby Info */}
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-2 bg-[#111317] border border-[#21252d] px-3 py-1.5 rounded-lg text-sm">
+          {/* Nickname, Theme and Lobby Info */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border transition-colors duration-200 ${
+              isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-100 border-slate-200'
+            }`}>
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-slate-400">Handle:</span>
+              <span className={isDark ? 'text-slate-400' : 'text-slate-505'}>Handle:</span>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => saveNickname(e.target.value)}
-                className="bg-transparent border-b border-slate-700 hover:border-[#4f5666] focus:border-[#4f5666] focus:outline-none font-semibold text-slate-300 w-32 px-1 py-0.5 transition"
+                className={`bg-transparent border-b hover:border-slate-400 focus:border-slate-500 focus:outline-none font-semibold w-32 px-1 py-0.5 transition ${
+                  isDark ? 'border-slate-700 text-slate-300' : 'border-slate-300 text-slate-750'
+                }`}
                 placeholder="Your Nickname"
                 title="Change nickname anytime"
               />
             </div>
 
+            <button
+              onClick={toggleTheme}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-bold border transition ${
+                isDark 
+                  ? 'bg-slate-600 hover:bg-slate-500 border-slate-500 text-white' 
+                  : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-800'
+              }`}
+              title="Toggle Light/Dark Mode"
+            >
+              {isDark ? '☀️ Light Mode' : '🌙 Dark Mode'}
+            </button>
+
             {roomData && (
               <button
                 onClick={handleLeaveRoom}
-                className="bg-[#2a1313] hover:bg-[#351818] border border-[#421d1d] text-[#fca5a5] text-xs font-bold px-3 py-2 rounded-lg transition"
+                className={`text-xs font-bold px-3 py-2 rounded-lg border transition ${
+                  isDark 
+                    ? 'bg-[#2a1313] hover:bg-[#351818] border-[#421d1d] text-[#fca5a5]' 
+                    : 'bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-600'
+                }`}
               >
                 Quit Room
               </button>
@@ -1212,14 +1249,22 @@ export default function App() {
 
         {/* Global Notifications */}
         {error && (
-          <div className="bg-[#2a1313]/80 border border-[#421d1d]/80 text-[#fca5a5] p-4 rounded-xl text-sm font-medium flex items-center justify-between shadow-lg">
+          <div className={`p-4 rounded-xl text-sm font-medium flex items-center justify-between shadow-lg border transition-colors ${
+            isDark 
+              ? 'bg-[#2a1313]/80 border-[#421d1d]/80 text-[#fca5a5]' 
+              : 'bg-rose-50 border-rose-200 text-rose-700'
+          }`}>
             <span>⚠️ {error}</span>
             <button onClick={() => setError('')} className="hover:text-white font-bold ml-3 text-lg">&times;</button>
           </div>
         )}
 
         {successMsg && (
-          <div className="bg-[#132a1d]/80 border border-[#1d422b]/80 text-[#86efac] p-4 rounded-xl text-sm font-medium flex items-center justify-between shadow-lg animate-bounce">
+          <div className={`p-4 rounded-xl text-sm font-medium flex items-center justify-between shadow-lg border animate-bounce transition-colors ${
+            isDark 
+              ? 'bg-[#132a1d]/80 border-[#1d422b]/80 text-[#86efac]' 
+              : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+          }`}>
             <span>✅ {successMsg}</span>
             <button onClick={() => setSuccessMsg('')} className="hover:text-white font-bold ml-3 text-lg">&times;</button>
           </div>
@@ -1230,33 +1275,37 @@ export default function App() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start my-auto">
 
             {/* Intro Features */}
-            <div className="lg:col-span-7 space-y-6 bg-[#15181d]/50 p-6 md:p-8 rounded-2xl border border-[#21252d]">
-              <h2 className="text-2xl md:text-3xl font-extrabold text-slate-100">Mathematically Balanced Scrabble</h2>
-              <p className="text-slate-300 text-sm md:text-base leading-relaxed">
-                Tired of losing matches because your opponent drew both Blank tiles, both high-pointers (<span className="text-slate-200 font-bold">Z</span>, <span className="text-slate-200 font-bold">Q</span>), and all the S's?
+            <div className={`lg:col-span-7 space-y-6 p-6 md:p-8 rounded-2xl border transition-colors ${
+              isDark ? 'bg-[#15181d]/50 border-[#21252d]' : 'bg-white border-slate-200 shadow-sm'
+            }`}>
+              <h2 className={`text-2xl md:text-3xl font-extrabold transition-colors ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>Mathematically Balanced Scrabble</h2>
+              <p className={`text-sm md:text-base leading-relaxed transition-colors ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                Tired of losing matches because your opponent drew both Blank tiles, both high-pointers (<span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-850'}`}>Z</span>, <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-850'}`}>Q</span>), and all the S's?
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs md:text-sm">
-                <div className="bg-[#111317] border border-[#21252d] p-4 rounded-xl">
-                  <h4 className="font-bold text-slate-200 mb-2">⚖️ Perfectly Even Tile Bags</h4>
-                  <p className="text-slate-400 leading-normal">
+                <div className={`border p-4 rounded-xl transition-colors ${isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-50 border-slate-200'}`}>
+                  <h4 className={`font-bold mb-2 transition-colors ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>⚖️ Perfectly Even Tile Bags</h4>
+                  <p className={`leading-normal transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                     Z, Q, X, and J are split 50/50 randomly. Each player gets exactly 1 Blank tile, and the S's are divided equally. Racks scale with grid sizes: 15x15 (7), 17x17 (8), 19x19 (9).
                   </p>
                 </div>
 
-                <div className="bg-[#111317] border border-[#21252d] p-4 rounded-xl">
-                  <h4 className="font-bold text-slate-200 mb-2">🧭 Rule Modifiers</h4>
-                  <p className="text-slate-400 leading-normal">
+                <div className={`border p-4 rounded-xl transition-colors ${isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-50 border-slate-200'}`}>
+                  <h4 className={`font-bold mb-2 transition-colors ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>🧭 Rule Modifiers</h4>
+                  <p className={`leading-normal transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                     Break traditional geometry boundaries! Play words diagonally down/up, backwards left, or backwards-diagonals to maximize points on premium squares.
                   </p>
                 </div>
               </div>
 
               {/* Live Status */}
-              <div className="bg-slate-400/10 border border-[#4f5666]/20 p-4 rounded-xl text-sm text-slate-300 flex items-center gap-3">
+              <div className={`border p-4 rounded-xl text-sm flex items-center gap-3 transition-colors ${
+                isDark ? 'bg-slate-400/10 border-[#4f5666]/20 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-600'
+              }`}>
                 <span className="relative flex h-3 w-3">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-[#2a2e37]"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-slate-400"></span>
                 </span>
                 <span>Configure a custom battle and share the Room Code with your friend to connect instantly.</span>
               </div>
@@ -1266,91 +1315,119 @@ export default function App() {
             <div className="lg:col-span-5 space-y-6">
 
               {/* Creator Settings Card */}
-              <div className="bg-[#15181d] border border-[#21252d] p-6 rounded-2xl shadow-2xl space-y-4">
-                <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+              <div className={`border p-6 rounded-2xl shadow-xl space-y-4 transition-colors ${
+                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+              }`}>
+                <h3 className={`text-lg font-bold flex items-center gap-2 transition-colors ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
                   🛠️ Create Custom Game
                 </h3>
 
                 {/* Grid Size Selection */}
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Grid & Tile Scale</label>
+                  <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Grid & Tile Scale</label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
                       { size: 15, label: '15x15 (Standard)', tiles: '100 tiles • 7 rack' },
                       { size: 17, label: '17x17 Grid', tiles: '130 tiles • 8 rack' },
                       { size: 19, label: '19x19 Grid', tiles: '160 tiles • 9 rack' }
-                    ].map(opt => (
-                      <button
-                        key={opt.size}
-                        type="button"
-                        onClick={() => setSelectedGridSize(opt.size)}
-                        className={`p-3 rounded-xl border text-center transition flex flex-col justify-center items-center gap-1 ${selectedGridSize === opt.size
-                          ? 'bg-[#2a2e37]/20 border-[#4f5666] text-slate-300'
-                          : 'bg-[#111317] border-[#21252d] hover:border-[#2d323f] text-slate-400'
+                    ].map(opt => {
+                      const isActive = selectedGridSize === opt.size;
+                      return (
+                        <button
+                          key={opt.size}
+                          type="button"
+                          onClick={() => setSelectedGridSize(opt.size)}
+                          className={`p-3 rounded-xl border text-center transition flex flex-col justify-center items-center gap-1 ${
+                            isActive
+                              ? isDark
+                                ? 'bg-slate-700 border-slate-500 text-white font-bold'
+                                : 'bg-slate-200 border-slate-400 text-slate-900 font-bold'
+                              : isDark
+                                ? 'bg-[#111317] border-[#21252d] hover:border-slate-700 text-slate-400'
+                                : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-500'
                           }`}
-                      >
-                        <span className="font-extrabold text-base">{opt.size}x{opt.size}</span>
-                        <span className="text-[9px] text-slate-400 text-center leading-tight">{opt.tiles}</span>
-                      </button>
-                    ))}
+                        >
+                          <span className="font-extrabold text-base">{opt.size}x{opt.size}</span>
+                          <span className={`text-[9px] text-center leading-tight transition-colors ${
+                            isActive
+                              ? isDark ? 'text-slate-300' : 'text-slate-600'
+                              : isDark ? 'text-slate-500' : 'text-slate-400'
+                          }`}>{opt.tiles}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* Additional Settings Toggles */}
-                <div className="space-y-3 bg-[#111317]/50 p-4 rounded-xl border border-[#21252d]">
-                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1">Permitted Directions</label>
+                <div className={`space-y-3 p-4 rounded-xl border transition-colors ${
+                  isDark ? 'bg-[#111317]/50 border-[#21252d]' : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <label className={`text-xs font-semibold uppercase tracking-wider block mb-1 transition-colors ${
+                    isDark ? 'text-slate-400' : 'text-slate-500'
+                  }`}>Permitted Directions</label>
 
-                  <label className="flex items-center justify-between p-1 hover:bg-slate-800/40 rounded-lg cursor-pointer transition">
+                  <label className={`flex items-center justify-between p-1 rounded-lg cursor-pointer transition ${
+                    isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-200/40'
+                  }`}>
                     <span className="text-sm font-medium">Diagonal Placement</span>
                     <input
                       type="checkbox"
                       checked={diagonalAllowed}
                       onChange={(e) => setDiagonalAllowed(e.target.checked)}
-                      className="accent-slate-400 h-4 w-4"
+                      className="accent-slate-500 h-4 w-4"
                     />
                   </label>
 
-                  <label className="flex items-center justify-between p-1 hover:bg-slate-800/40 rounded-lg cursor-pointer transition">
+                  <label className={`flex items-center justify-between p-1 rounded-lg cursor-pointer transition ${
+                    isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-200/40'
+                  }`}>
                     <span className="text-sm font-medium">Backwards Spelling</span>
                     <input
                       type="checkbox"
                       checked={backwardsAllowed}
                       onChange={(e) => setBackwardsAllowed(e.target.checked)}
-                      className="accent-slate-400 h-4 w-4"
+                      className="accent-slate-500 h-4 w-4"
                     />
                   </label>
 
-                  <label className="flex items-center justify-between p-1 hover:bg-slate-800/40 rounded-lg cursor-pointer transition">
+                  <label className={`flex items-center justify-between p-1 rounded-lg cursor-pointer transition ${
+                    isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-200/40'
+                  }`}>
                     <span className="text-sm font-medium">Diagonal & Backwards</span>
                     <input
                       type="checkbox"
                       checked={diagonalBackwardsAllowed}
                       onChange={(e) => setDiagonalBackwardsAllowed(e.target.checked)}
-                      className="accent-slate-400 h-4 w-4"
+                      className="accent-slate-500 h-4 w-4"
                     />
                   </label>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Spell Check Mode</label>
+                  <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${
+                    isDark ? 'text-slate-400' : 'text-slate-500'
+                  }`}>Spell Check Mode</label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => setValidationMode('manual')}
-                      className={`p-2.5 rounded-xl border text-xs font-bold transition ${validationMode === 'manual'
-                        ? 'bg-slate-800 border-[#4f5666] text-slate-300'
-                        : 'bg-[#111317] border-[#21252d] text-slate-400'
-                        }`}
+                      className={`p-2.5 rounded-xl border text-xs font-bold transition ${
+                        validationMode === 'manual'
+                          ? isDark ? 'bg-slate-700 border-slate-500 text-white' : 'bg-slate-200 border-slate-400 text-slate-800'
+                          : isDark ? 'bg-[#111317] border-[#21252d] text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'
+                      }`}
                     >
                       🗣️ Self-Judge Mode (Default)
                     </button>
                     <button
                       type="button"
                       onClick={() => setValidationMode('strict')}
-                      className={`p-2.5 rounded-xl border text-xs font-bold transition ${validationMode === 'strict'
-                        ? 'bg-slate-800 border-[#4f5666] text-slate-300'
-                        : 'bg-[#111317] border-[#21252d] text-slate-400'
-                        }`}
+                      className={`p-2.5 rounded-xl border text-xs font-bold transition ${
+                        validationMode === 'strict'
+                          ? isDark ? 'bg-slate-700 border-slate-500 text-white' : 'bg-slate-200 border-slate-400 text-slate-800'
+                          : isDark ? 'bg-[#111317] border-[#21252d] text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'
+                      }`}
                       title="Checks placed words against official dictionary API"
                     >
                       📚 Auto-Check Strict
@@ -1366,28 +1443,42 @@ export default function App() {
                     diagonalBackwardsAllowed,
                     validationMode
                   })}
-                  className="w-full bg-gradient-to-r from-[#2a2e37] to-[#343944] border border-[#3e4350] hover:from-[#343944] hover:to-[#3e4350] text-slate-950 font-black text-sm py-3 px-4 rounded-xl shadow-lg transition active:scale-[0.98]"
+                  className={`w-full font-black text-sm py-3 px-4 rounded-xl shadow-lg transition active:scale-[0.98] border ${
+                    isDark 
+                      ? 'bg-slate-350 hover:bg-slate-200 border-slate-400 text-slate-950' 
+                      : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-950'
+                  }`}
                 >
                   Create Lobby & Wait
                 </button>
               </div>
 
               {/* Join Existing Card */}
-              <div className="bg-[#15181d] border border-[#21252d] p-6 rounded-2xl shadow-2xl space-y-4">
-                <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+              <div className={`border p-6 rounded-2xl shadow-xl space-y-4 transition-colors ${
+                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+              }`}>
+                <h3 className={`text-lg font-bold flex items-center gap-2 transition-colors ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
                   🎮 Join Existing Game
                 </h3>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     placeholder="Enter Room Code (e.g. J9FX4)"
-                    className="flex-1 bg-[#111317] border border-[#21252d] hover:border-[#2d323f] focus:border-[#4f5666] focus:outline-none rounded-xl py-3 px-4 text-slate-300 uppercase font-black text-center tracking-widest placeholder:normal-case placeholder:font-normal placeholder:text-slate-500"
+                    className={`flex-1 focus:outline-none rounded-xl py-3 px-4 uppercase font-black text-center tracking-widest placeholder:normal-case placeholder:font-normal transition-colors border ${
+                      isDark 
+                        ? 'bg-[#111317] border-[#21252d] hover:border-slate-700 focus:border-slate-500 text-slate-300 placeholder:text-slate-500' 
+                        : 'bg-slate-50 border-slate-200 hover:border-slate-300 focus:border-slate-400 text-slate-800 placeholder:text-slate-400'
+                    }`}
                     value={joinInput}
                     onChange={(e) => setJoinInput(e.target.value)}
                   />
                   <button
                     onClick={() => handleJoinRoom(joinInput)}
-                    className="bg-[#2a2e37] hover:bg-slate-400 text-slate-950 font-black px-6 py-3 rounded-xl shadow-md transition active:scale-[0.98]"
+                    className={`font-black px-6 py-3 rounded-xl shadow-md transition active:scale-[0.98] border ${
+                      isDark 
+                        ? 'bg-slate-350 hover:bg-slate-200 border-slate-400 text-slate-950' 
+                        : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-950'
+                    }`}
                   >
                     Join
                   </button>
@@ -1404,19 +1495,23 @@ export default function App() {
             <div className="lg:col-span-8 space-y-4 flex flex-col items-center">
 
               {/* Game Info Bar */}
-              <div className="w-full bg-[#15181d] border border-[#21252d] p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+              <div className={`w-full p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl border transition-colors ${
+                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+              }`}>
 
                 {/* Share Room Info */}
-                <div className="flex items-center gap-2 bg-[#111317] border border-[#21252d] px-3 py-1.5 rounded-xl">
-                  <span className="text-xs text-slate-400">Room Code:</span>
-                  <span className="font-extrabold text-slate-200 text-sm tracking-wider">{roomId}</span>
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-colors ${
+                  isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Room Code:</span>
+                  <span className={`font-extrabold text-sm tracking-wider ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{roomId}</span>
                   <button
                     onClick={copyRoomIdToClipboard}
-                    className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition"
+                    className="p-1 hover:bg-slate-850 rounded text-slate-400 hover:text-slate-600 transition"
                     title="Copy Room ID"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 002 2h2a2 2 0 002-2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
                     </svg>
                   </button>
                 </div>
@@ -1424,39 +1519,58 @@ export default function App() {
                 {/* Match Status / Turn indicator */}
                 <div className="flex items-center gap-3">
                   {roomData.status === 'playing' ? (
-                    <div className={`px-4 py-2 rounded-xl border text-sm font-bold flex items-center gap-2 ${isMyTurn
-                      ? 'bg-[#2a2e37]/20 border-[#4f5666] text-slate-300 animate-pulse'
-                      : 'bg-[#111317] border-[#21252d] text-slate-400'
-                      }`}>
-                      <span className={`w-2 h-2 rounded-full ${isMyTurn ? 'bg-slate-400' : 'bg-slate-600'}`}></span>
+                    <div className={`px-4 py-2 rounded-xl border text-sm font-bold flex items-center gap-2 transition-colors ${
+                      isMyTurn
+                        ? isDark
+                          ? 'bg-slate-800 border-slate-600 text-white animate-pulse'
+                          : 'bg-amber-50 border-amber-300 text-amber-850 animate-pulse'
+                        : isDark
+                          ? 'bg-[#111317] border-[#21252d] text-slate-400'
+                          : 'bg-slate-50 border-slate-200 text-slate-500'
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${
+                        isMyTurn 
+                          ? isDark ? 'bg-slate-300' : 'bg-amber-500' 
+                          : isDark ? 'bg-slate-600' : 'bg-slate-400'
+                      }`}></span>
                       {isMyTurn ? "Your Turn!" : `${roomData.players[roomData.activePlayerId]?.name || "Opponent"}'s Turn`}
                     </div>
                   ) : (
-                    <div className="bg-[#111317] border border-[#21252d] text-rose-400 px-4 py-2 rounded-xl text-sm font-bold">
+                    <div className={`border px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+                      isDark ? 'bg-[#111317] border-[#21252d] text-rose-400' : 'bg-rose-50 border-rose-200 text-rose-600'
+                    }`}>
                       Game Waiting
                     </div>
                   )}
                 </div>
 
                 {/* Grid Zoom Scale Controls */}
-                <div className="flex items-center gap-1 bg-[#111317] border border-[#21252d] p-1 rounded-xl">
+                <div className={`flex items-center gap-1 p-1 rounded-xl border transition-colors ${
+                  isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-50 border-slate-200'
+                }`}>
                   <button
                     onClick={() => setBoardZoom(Math.max(0.6, boardZoom - 0.1))}
-                    className="w-8 h-8 flex items-center justify-center hover:bg-slate-800 rounded-lg text-slate-300 font-bold text-sm transition"
+                    className={`w-8 h-8 flex items-center justify-center rounded-lg font-bold text-sm transition ${
+                      isDark ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-200 text-slate-700'
+                    }`}
                     title="Zoom Out"
                   >
                     A-
                   </button>
                   <button
                     onClick={() => setBoardZoom(1)}
-                    className="px-2 py-1 text-[11px] text-slate-500 font-medium hover:text-slate-300 transition"
+                    className={`px-2 py-1 text-[11px] font-medium transition ${
+                      isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-450 hover:text-slate-700'
+                    }`}
                     title="Reset Zoom"
                   >
                     100%
                   </button>
                   <button
                     onClick={() => setBoardZoom(Math.min(1.4, boardZoom + 0.1))}
-                    className="w-8 h-8 flex items-center justify-center hover:bg-slate-800 rounded-lg text-slate-300 font-bold text-sm transition"
+                    className={`w-8 h-8 flex items-center justify-center rounded-lg font-bold text-sm transition ${
+                      isDark ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-200 text-slate-700'
+                    }`}
                     title="Zoom In"
                   >
                     A+
@@ -1466,8 +1580,12 @@ export default function App() {
               </div>
 
               {/* Interactive Scrabble Board Display */}
-              <div className="w-full bg-[#15181d] border border-[#21252d] p-1.5 md:p-6 rounded-2xl shadow-2xl overflow-auto flex justify-start md:justify-center">
-                <div className="select-none bg-[#111317] p-1.5 md:p-2 rounded-xl">
+              <div className={`w-full p-1.5 md:p-6 rounded-2xl shadow-2xl overflow-auto flex justify-start md:justify-center border transition-colors ${
+                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+              }`}>
+                <div className={`select-none p-1.5 md:p-2 rounded-xl border transition-colors ${
+                  isDark ? 'bg-[#111317] border-slate-900' : 'bg-slate-200 border-slate-300'
+                }`}>
                   <div
                     className="grid"
                     style={{
@@ -1484,24 +1602,46 @@ export default function App() {
                         const bonus = getBonus(r, c, roomData.gridSize);
 
                         // Layout styling for special squares
-                        let cellBg = 'bg-[#262a33] hover:bg-[#2e333e] border border-[#323743] text-slate-400';
+                        let cellBg = '';
                         let cellLabel = '';
 
-                        if (bonus === 'TW') {
-                          cellBg = 'bg-[#782b2b] border border-[#8f3636] text-[#e2b4b4]';
-                          cellLabel = 'TW';
-                        } else if (bonus === 'DW') {
-                          cellBg = 'bg-[#914d4d] border border-[#a85b5b] text-[#eed3d3]';
-                          cellLabel = 'DW';
-                        } else if (bonus === 'TL') {
-                          cellBg = 'bg-[#162d4c] border border-[#203c62] text-[#a8c0e0]';
-                          cellLabel = 'TL';
-                        } else if (bonus === 'DL') {
-                          cellBg = 'bg-[#26415a] border border-[#335372] text-[#bcd5eb]';
-                          cellLabel = 'DL';
-                        } else if (bonus === 'star') {
-                          cellBg = 'bg-[#914d4d] border border-[#a85b5b] text-[#eed3d3]';
-                          cellLabel = '★';
+                        if (isDark) {
+                          cellBg = 'bg-[#262a33] hover:bg-[#2e333e] border border-[#323743] text-slate-400';
+                          if (bonus === 'TW') {
+                            cellBg = 'bg-[#782b2b] border border-[#8f3636] text-[#e2b4b4]';
+                            cellLabel = 'TW';
+                          } else if (bonus === 'DW') {
+                            cellBg = 'bg-[#914d4d] border border-[#a85b5b] text-[#eed3d3]';
+                            cellLabel = 'DW';
+                          } else if (bonus === 'TL') {
+                            cellBg = 'bg-[#162d4c] border border-[#203c62] text-[#a8c0e0]';
+                            cellLabel = 'TL';
+                          } else if (bonus === 'DL') {
+                            cellBg = 'bg-[#26415a] border border-[#335372] text-[#bcd5eb]';
+                            cellLabel = 'DL';
+                          } else if (bonus === 'star') {
+                            cellBg = 'bg-[#914d4d] border border-[#a85b5b] text-[#eed3d3]';
+                            cellLabel = '★';
+                          }
+                        } else {
+                          // Light theme classic pastel/bright Scrabble board styling
+                          cellBg = 'bg-[#f8fafc] hover:bg-[#cbd5e1]/40 border border-slate-300 text-slate-400';
+                          if (bonus === 'TW') {
+                            cellBg = 'bg-[#f43f5e] border border-[#fda4af] text-white';
+                            cellLabel = 'TW';
+                          } else if (bonus === 'DW') {
+                            cellBg = 'bg-[#fda4af] border border-[#fecdd3] text-[#881337]';
+                            cellLabel = 'DW';
+                          } else if (bonus === 'TL') {
+                            cellBg = 'bg-[#2563eb] border border-[#93c5fd] text-white';
+                            cellLabel = 'TL';
+                          } else if (bonus === 'DL') {
+                            cellBg = 'bg-[#7dd3fc] border border-[#bae6fd] text-[#0c4a6e]';
+                            cellLabel = 'DL';
+                          } else if (bonus === 'star') {
+                            cellBg = 'bg-[#fda4af] border border-[#fecdd3] text-[#881337]';
+                            cellLabel = '★';
+                          }
                         }
 
                         return (
@@ -1543,7 +1683,7 @@ export default function App() {
 
                             {/* Render default bonus label if empty */}
                             {!permTile && !tempTile && (
-                              <span className="font-black tracking-tighter opacity-80" style={{ fontSize: `${cellSize * 0.32}px`, color: (cellLabel === 'DL' || cellLabel === '★') ? '#0f172a' : undefined }}>{cellLabel}</span>
+                              <span className="font-black tracking-tighter" style={{ fontSize: `${cellSize * 0.32}px` }}>{cellLabel}</span>
                             )}
                           </div>
                         );
@@ -1554,15 +1694,19 @@ export default function App() {
               </div>
 
               {/* Rack Controls Section */}
-              <div className="w-full bg-[#15181d] border border-[#21252d] p-4 md:p-6 rounded-2xl shadow-xl space-y-4">
+              <div className={`w-full border p-4 md:p-6 rounded-2xl shadow-xl space-y-4 transition-colors ${
+                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+              }`}>
 
                 {/* Rack Tiles */}
                 <div className="flex flex-col items-center gap-3">
-                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block">
+                  <span className={`text-xs font-semibold uppercase tracking-widest block transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                     {exchangeMode ? "Select Tiles to Exchange" : "Your Tile Rack"}
                   </span>
 
-                  <div className="flex items-center gap-2 md:gap-3 bg-[#111317] p-3 rounded-2xl border border-[#21252d] shadow-inner max-w-full overflow-x-auto">
+                  <div className={`flex items-center gap-2 md:gap-3 p-3 rounded-2xl border shadow-inner max-w-full overflow-x-auto transition-colors ${
+                    isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-100 border-slate-200'
+                  }`}>
                     {me?.rack.map((tile, idx) => {
                       // Check if tile is tentatively placed on the board right now
                       const isPlaced = Object.values(tentativePlaced).some(t => t.id === tile.id);
@@ -1574,14 +1718,17 @@ export default function App() {
                           disabled={isPlaced && !exchangeMode}
                           onClick={() => selectRackTile(idx)}
                           style={{ fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif' }}
-                          className={`w-10 h-12 md:w-12 md:h-14 shrink-0 rounded-sm flex flex-col items-center justify-center relative font-extrabold shadow transition transform active:scale-95 ${isPlaced
-                            ? 'opacity-20 cursor-not-allowed bg-[#1f232b] border border-dashed border-[#2a2e37]'
-                            : isSelectedExchange
-                              ? 'bg-[#782b2b] border-2 border-[#8f3636] text-white scale-105'
-                              : selectedRackTile === idx
-                                ? 'bg-[#e3cb98] border-2 border-amber-500 text-[#2d2008] -translate-y-2 ring-4 ring-[#4f5666]/30'
-                                : 'bg-[#d7be8a] text-[#2d2008] border border-[#bfa573] hover:bg-[#e3cb98]'
-                            }`}
+                          className={`w-10 h-12 md:w-12 md:h-14 shrink-0 rounded-sm flex flex-col items-center justify-center relative font-extrabold shadow transition transform active:scale-95 ${
+                            isPlaced
+                              ? isDark
+                                ? 'opacity-20 cursor-not-allowed bg-[#1f232b] border border-dashed border-[#2a2e37]'
+                                : 'opacity-20 cursor-not-allowed bg-slate-200 border border-dashed border-slate-350'
+                              : isSelectedExchange
+                                ? 'bg-[#782b2b] border-2 border-[#8f3636] text-white scale-105'
+                                : selectedRackTile === idx
+                                  ? 'bg-[#e3cb98] border-2 border-amber-500 text-[#2d2008] -translate-y-2 ring-4 ring-amber-500/30'
+                                  : 'bg-[#d7be8a] text-[#2d2008] border border-[#bfa573] hover:bg-[#e3cb98]'
+                          }`}
                         >
                           <span className="text-lg md:text-xl leading-none font-extrabold">{tile.letter === '_' ? '' : tile.letter}</span>
                           <span className="absolute bottom-1 right-1 text-[9px] md:text-[10px] leading-none font-bold">{tile.score}</span>
@@ -1598,18 +1745,22 @@ export default function App() {
 
                 {/* Score Summary of Pending Play */}
                 {Object.keys(tentativePlaced).length > 0 && scoreReport && (
-                  <div className="bg-[#111317]/80 border border-[#21252d] p-4 rounded-xl flex flex-col gap-2">
+                  <div className={`p-4 rounded-xl flex flex-col gap-2 border transition-colors ${
+                    isDark ? 'bg-[#111317]/80 border-[#21252d]' : 'bg-slate-50 border-slate-200 shadow-inner'
+                  }`}>
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-slate-200 font-bold flex items-center gap-1.5">
+                      <span className={`font-bold flex items-center gap-1.5 transition-colors ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
                         <span>📝 Words formed:</span>
                         {scoreReport.words.map((w, i) => (
-                          <span key={i} className="bg-slate-800 px-2 py-0.5 rounded text-xs text-white font-mono">
+                          <span key={i} className={`px-2 py-0.5 rounded text-xs font-mono transition-colors ${
+                            isDark ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-805'
+                          }`}>
                             {w.forwardWord} ({w.score} pts)
                             {(roomData.backwardsAllowed || roomData.diagonalBackwardsAllowed) && w.forwardWord !== w.backwardWord && ` / ${w.backwardWord}`}
                           </span>
                         ))}
                       </span>
-                      <span className="font-extrabold text-white text-base">
+                      <span className={`font-extrabold text-base transition-colors ${isDark ? 'text-white' : 'text-slate-900'}`}>
                         +{scoreReport.totalScore} pts
                       </span>
                     </div>
@@ -1619,7 +1770,7 @@ export default function App() {
                       </div>
                     )}
                     {scoreReport.error && (
-                      <div className="text-xs text-rose-400">
+                      <div className="text-xs text-rose-455">
                         ❌ Invalid layout: {scoreReport.error}
                       </div>
                     )}
@@ -1637,7 +1788,11 @@ export default function App() {
                         setSelectedExchangeIds([]);
                         setSelectedRackTile(null);
                       }}
-                      className="bg-[#111317] border border-[#21252d] hover:border-[#2d323f] text-slate-300 font-bold py-2.5 px-3 rounded-xl text-xs transition"
+                      className={`font-bold py-2.5 px-3 rounded-xl text-xs transition border ${
+                        isDark 
+                          ? 'bg-slate-600 hover:bg-slate-500 text-white border-slate-500' 
+                          : 'bg-slate-200 hover:bg-slate-300 text-slate-800 border-slate-300'
+                      }`}
                     >
                       🔄 Exchange Tiles
                     </button>
@@ -1645,16 +1800,24 @@ export default function App() {
                     <div className="col-span-2 md:col-span-1 flex gap-1">
                       <button
                         onClick={handleExchangeTiles}
-                        className="flex-1 bg-[#571c1c] hover:bg-[#6b2323] text-white font-bold py-2.5 px-2 rounded-xl text-xs transition"
+                        className={`flex-1 font-bold py-2.5 px-2 rounded-xl text-xs transition border ${
+                          isDark 
+                            ? 'bg-[#782b2b] hover:bg-[#8f3636] border-[#8f3636] text-white' 
+                            : 'bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-700'
+                        }`}
                       >
-                        Confirm exchange
+                        Confirm
                       </button>
                       <button
                         onClick={() => {
                           setExchangeMode(false);
                           setSelectedExchangeIds([]);
                         }}
-                        className="bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold px-3 py-2.5 rounded-xl text-xs transition"
+                        className={`font-bold px-3 py-2.5 rounded-xl text-xs transition border ${
+                          isDark 
+                            ? 'bg-slate-600 hover:bg-slate-500 text-white border-slate-500' 
+                            : 'bg-slate-200 hover:bg-slate-300 text-slate-800 border-slate-300'
+                        }`}
                       >
                         Cancel
                       </button>
@@ -1663,7 +1826,11 @@ export default function App() {
 
                   <button
                     onClick={shuffleRack}
-                    className="bg-[#111317] border border-[#21252d] hover:border-[#2d323f] text-slate-300 font-bold py-2.5 px-3 rounded-xl text-xs transition"
+                    className={`font-bold py-2.5 px-3 rounded-xl text-xs transition border ${
+                      isDark 
+                        ? 'bg-slate-600 hover:bg-slate-500 text-white border-slate-500' 
+                        : 'bg-slate-200 hover:bg-slate-300 text-slate-800 border-slate-300'
+                    }`}
                   >
                     🔀 Shuffle Rack
                   </button>
@@ -1671,7 +1838,11 @@ export default function App() {
                   <button
                     onClick={recallAllTentative}
                     disabled={Object.keys(tentativePlaced).length === 0}
-                    className="bg-[#111317] border border-[#21252d] hover:border-[#2d323f] text-slate-300 font-bold py-2.5 px-3 rounded-xl text-xs transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`font-bold py-2.5 px-3 rounded-xl text-xs transition border ${
+                      isDark 
+                        ? 'bg-slate-600 hover:bg-slate-500 text-white border-slate-500 disabled:bg-slate-800 disabled:border-slate-700 disabled:text-slate-500' 
+                        : 'bg-slate-200 hover:bg-slate-300 text-slate-800 border-slate-300 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     ↩️ Recall All
                   </button>
@@ -1679,7 +1850,11 @@ export default function App() {
                   <button
                     onClick={handlePassTurn}
                     disabled={!isMyTurn}
-                    className="bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 font-bold py-2.5 px-3 rounded-xl text-xs transition disabled:opacity-50"
+                    className={`font-bold py-2.5 px-3 rounded-xl text-xs transition border ${
+                      isDark 
+                        ? 'bg-slate-600 hover:bg-slate-500 text-white border-slate-500 disabled:bg-slate-800 disabled:border-slate-700 disabled:text-slate-500' 
+                        : 'bg-slate-200 hover:bg-slate-300 text-slate-800 border-slate-300 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400'
+                    } disabled:opacity-50`}
                   >
                     ⏭️ Pass Turn
                   </button>
@@ -1687,7 +1862,11 @@ export default function App() {
                   <button
                     onClick={handlePlayTurn}
                     disabled={!isMyTurn || Object.keys(tentativePlaced).length === 0}
-                    className="col-span-2 md:col-span-1 bg-gradient-to-r from-[#2a2e37] to-[#343944] border border-[#3e4350] hover:from-[#343944] hover:to-[#3e4350] text-slate-950 font-black py-2.5 px-3 rounded-xl text-xs shadow-lg transition disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 disabled:shadow-none active:scale-95"
+                    className={`col-span-2 md:col-span-1 font-black py-2.5 px-3 rounded-xl text-xs shadow-lg transition active:scale-95 border ${
+                      isDark 
+                        ? 'bg-slate-300 hover:bg-slate-200 text-slate-955 border-slate-400 disabled:bg-slate-800 disabled:border-slate-700 disabled:text-slate-550' 
+                        : 'bg-slate-200 hover:bg-slate-300 text-slate-955 border-slate-300 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-450'
+                    } disabled:shadow-none disabled:opacity-50`}
                   >
                     🚀 Play Word
                   </button>
@@ -1702,48 +1881,62 @@ export default function App() {
             <div className="lg:col-span-4 space-y-6">
 
               {/* Scoreboard Card */}
-              <div className="bg-[#15181d] border border-[#21252d] p-5 rounded-2xl shadow-xl space-y-4">
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Scoreboard</h3>
+              <div className={`border p-5 rounded-2xl shadow-xl space-y-4 transition-colors ${
+                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+              }`}>
+                <h3 className={`text-sm font-bold uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Scoreboard</h3>
                 <div className="space-y-3">
 
                   {/* Current Active Player */}
-                  <div className={`p-4 rounded-xl border flex items-center justify-between transition ${roomData.activePlayerId === user.uid
-                    ? 'bg-[#2a2e37]/10 border-[#2a2e37]/30 ring-1 ring-slate-500/20'
-                    : 'bg-[#111317] border-[#21252d]'
-                    }`}>
+                  <div className={`p-4 rounded-xl border flex items-center justify-between transition ${
+                    roomData.activePlayerId === user.uid
+                      ? isDark
+                        ? 'bg-slate-850 border-slate-700 ring-1 ring-slate-550/20'
+                        : 'bg-amber-50 border-amber-300 ring-1 ring-amber-400/20'
+                      : isDark
+                        ? 'bg-[#111317] border-[#21252d]'
+                        : 'bg-slate-50 border-slate-200'
+                  }`}>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-slate-200">{username} (You)</span>
+                        <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{username} (You)</span>
                         <span className="text-[10px] bg-[#21252d]/50 px-1.5 py-0.5 rounded text-[#94a3b8]">A</span>
                       </div>
-                      <p className="text-xs text-slate-400 mt-1">Remaining Tiles: {me?.deck.length}</p>
+                      <p className={`text-xs mt-1 transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Remaining Tiles: {me?.deck.length}</p>
                     </div>
                     <div className="text-right">
-                      <span className="text-2xl font-black text-slate-200">{me?.score}</span>
-                      <span className="text-xs text-slate-500 block">pts</span>
+                      <span className={`text-2xl font-black transition-colors ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{me?.score}</span>
+                      <span className={`text-xs block transition-colors ${isDark ? 'text-slate-550' : 'text-slate-400'}`}>pts</span>
                     </div>
                   </div>
 
                   {/* Opponent Player */}
                   {opponent ? (
-                    <div className={`p-4 rounded-xl border flex items-center justify-between transition ${roomData.activePlayerId === opponent.uid
-                      ? 'bg-[#2a2e37]/10 border-[#2a2e37]/30 ring-1 ring-slate-500/20'
-                      : 'bg-[#111317] border-[#21252d]'
-                      }`}>
+                    <div className={`p-4 rounded-xl border flex items-center justify-between transition ${
+                      roomData.activePlayerId === opponent.uid
+                        ? isDark
+                          ? 'bg-slate-850 border-slate-700 ring-1 ring-slate-550/20'
+                          : 'bg-amber-50 border-amber-300 ring-1 ring-amber-400/20'
+                        : isDark
+                          ? 'bg-[#111317] border-[#21252d]'
+                          : 'bg-slate-50 border-slate-200'
+                    }`}>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-slate-200">{opponent.name}</span>
+                          <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{opponent.name}</span>
                           <span className="text-[10px] bg-[#571c1c]/50 px-1.5 py-0.5 rounded text-[#fca5a5]">B</span>
                         </div>
-                        <p className="text-xs text-slate-400 mt-1">Remaining Tiles: {opponent.deck.length}</p>
+                        <p className={`text-xs mt-1 transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Remaining Tiles: {opponent.deck.length}</p>
                       </div>
                       <div className="text-right">
-                        <span className="text-2xl font-black text-slate-200">{opponent.score}</span>
-                        <span className="text-xs text-slate-500 block">pts</span>
+                        <span className={`text-2xl font-black transition-colors ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{opponent.score}</span>
+                        <span className={`text-xs block transition-colors ${isDark ? 'text-slate-550' : 'text-slate-400'}`}>pts</span>
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-[#111317]/50 border border-dashed border-[#21252d] p-4 rounded-xl text-center text-xs text-slate-500">
+                    <div className={`border p-4 rounded-xl text-center text-xs transition-colors ${
+                      isDark ? 'bg-[#111317]/50 border-dashed border-[#21252d] text-slate-500' : 'bg-slate-50 border-dashed border-slate-250 text-slate-400'
+                    }`}>
                       Waiting for opponents...
                     </div>
                   )}
@@ -1752,66 +1945,87 @@ export default function App() {
               </div>
 
               {/* Game Settings Display Card */}
-              <div className="bg-[#15181d] border border-[#21252d] p-4 rounded-2xl text-xs space-y-2">
-                <h4 className="font-bold text-slate-400 uppercase tracking-widest mb-1.5">Game Settings</h4>
-                <div className="grid grid-cols-2 gap-2 text-slate-300">
-                  <div className="bg-[#111317] p-2 rounded">
+              <div className={`border p-4 rounded-2xl text-xs space-y-2 transition-colors ${
+                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+              }`}>
+                <h4 className={`font-bold uppercase tracking-widest mb-1.5 transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Game Settings</h4>
+                <div className="grid grid-cols-2 gap-2 text-slate-350">
+                  <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
                     <span className="text-slate-500 block">Grid Size:</span>
-                    <span className="font-extrabold text-slate-300">{roomData.gridSize}x{roomData.gridSize}</span>
+                    <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.gridSize}x{roomData.gridSize}</span>
                   </div>
-                  <div className="bg-[#111317] p-2 rounded">
+                  <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
                     <span className="text-slate-500 block">Rack Size:</span>
-                    <span className="font-extrabold text-slate-300">{roomData.rackSize} tiles</span>
+                    <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.rackSize} tiles</span>
                   </div>
-                  <div className="bg-[#111317] p-2 rounded">
+                  <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
                     <span className="text-slate-500 block">Diagonals:</span>
-                    <span className="font-extrabold text-slate-300">{roomData.diagonalAllowed ? 'Allowed' : 'Disabled'}</span>
+                    <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.diagonalAllowed ? 'Allowed' : 'Disabled'}</span>
                   </div>
-                  <div className="bg-[#111317] p-2 rounded">
+                  <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
                     <span className="text-slate-500 block">Backwards:</span>
-                    <span className="font-extrabold text-slate-300">{roomData.backwardsAllowed ? 'Allowed' : (roomData.diagonalBackwardsAllowed ? 'Diag Only' : 'Disabled')}</span>
+                    <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.backwardsAllowed ? 'Allowed' : (roomData.diagonalBackwardsAllowed ? 'Diag Only' : 'Disabled')}</span>
                   </div>
                 </div>
               </div>
 
               {/* In-Game Live Word Verification Helper Tool */}
-              <div className="bg-[#15181d] border border-[#21252d] p-4 rounded-2xl shadow-xl space-y-3">
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">📚 Online Dictionary Lookup</h3>
+              <div className={`border p-4 rounded-2xl shadow-xl space-y-3 transition-colors ${
+                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+              }`}>
+                <h3 className={`text-sm font-bold uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400' : 'text-slate-505'}`}>📚 Online Dictionary Lookup</h3>
                 <form onSubmit={handleDictCheck} className="flex gap-2">
                   <input
                     type="text"
                     value={dictWord}
                     onChange={(e) => setDictWord(e.target.value)}
                     placeholder="Check any word..."
-                    className="flex-1 bg-[#111317] border border-[#21252d] hover:border-[#2d323f] focus:border-[#4f5666] focus:outline-none rounded-xl py-1.5 px-3 text-xs text-slate-300 font-mono"
+                    className={`flex-1 focus:outline-none rounded-xl py-1.5 px-3 text-xs font-mono transition-colors border ${
+                      isDark 
+                        ? 'bg-[#111317] border-[#21252d] hover:border-slate-700 focus:border-slate-500 text-slate-300' 
+                        : 'bg-slate-50 border-slate-200 hover:border-slate-350 focus:border-slate-400 text-slate-800'
+                    }`}
                   />
                   <button
                     type="submit"
-                    className="bg-[#2a2e37] hover:bg-slate-400 text-slate-950 font-black text-xs px-4 rounded-xl transition"
+                    className={`font-black text-xs px-4 rounded-xl transition border ${
+                      isDark 
+                        ? 'bg-slate-300 hover:bg-slate-200 border-slate-400 text-slate-900' 
+                        : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-900'
+                    }`}
                   >
                     {dictChecking ? '...' : 'Verify'}
                   </button>
                 </form>
 
                 {dictResult && (
-                  <div className={`p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between ${dictResult.valid
-                    ? 'bg-[#132a1d]/50 border border-[#1d422b]/60 text-emerald-300'
-                    : 'bg-[#2a1313]/50 border border-[#421d1d]/60 text-rose-300'
-                    }`}>
+                  <div className={`p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between border ${
+                    dictResult.valid
+                      ? isDark 
+                        ? 'bg-[#132a1d]/50 border-[#1d422b]/60 text-emerald-300' 
+                        : 'bg-emerald-50 border-emerald-250 text-emerald-700'
+                      : isDark 
+                        ? 'bg-[#2a1313]/50 border-[#421d1d]/60 text-rose-350' 
+                        : 'bg-rose-50 border-rose-250 text-rose-700'
+                  }`}>
                     <span>"{dictResult.word.toUpperCase()}" {dictResult.valid ? 'is a VALID English Word ✅' : 'is NOT in Dictionary ❌'}</span>
                   </div>
                 )}
               </div>
 
               {/* Real-time Log & History Actions */}
-              <div className="bg-[#15181d] border border-[#21252d] p-4 rounded-2xl shadow-xl space-y-3">
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">📜 Game Play Log</h3>
-                <div className="h-32 overflow-y-auto space-y-1.5 pr-1 text-[11px] font-mono border-t border-slate-900 pt-2">
+              <div className={`border p-4 rounded-2xl shadow-xl space-y-3 transition-colors ${
+                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+              }`}>
+                <h3 className={`text-sm font-bold uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>📜 Game Play Log</h3>
+                <div className={`h-32 overflow-y-auto space-y-1.5 pr-1 text-[11px] font-mono border-t pt-2 transition-colors ${
+                  isDark ? 'border-slate-900' : 'border-slate-200'
+                }`}>
                   {roomData.history?.slice().reverse().map((item, idx) => {
-                    let color = 'text-slate-400';
-                    if (item.type === 'turn') color = 'text-[#4ade80] font-semibold';
-                    if (item.type === 'pass') color = 'text-slate-500';
-                    if (item.type === 'exchange') color = 'text-sky-400';
+                    let color = isDark ? 'text-slate-400' : 'text-slate-600';
+                    if (item.type === 'turn') color = isDark ? 'text-[#4ade80] font-semibold' : 'text-emerald-700 font-semibold';
+                    if (item.type === 'pass') color = isDark ? 'text-slate-500' : 'text-slate-400';
+                    if (item.type === 'exchange') color = isDark ? 'text-sky-400' : 'text-sky-700';
 
                     return (
                       <div key={item.id || idx} className={`${color} leading-tight`}>
@@ -1823,30 +2037,39 @@ export default function App() {
               </div>
 
               {/* Chat Panel Box */}
-              <div className="bg-[#15181d] border border-[#21252d] rounded-2xl shadow-xl flex flex-col h-64 overflow-hidden">
-                <div className="bg-[#111317] border-b border-[#21252d] px-4 py-3 flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">💬 Room Chat</h3>
+              <div className={`border rounded-2xl shadow-xl flex flex-col h-64 overflow-hidden transition-colors ${
+                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+              }`}>
+                <div className={`border-b px-4 py-3 flex items-center justify-between transition-colors ${
+                  isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-100 border-slate-200'
+                }`}>
+                  <h3 className={`text-sm font-bold uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>💬 Room Chat</h3>
                 </div>
 
                 {/* Messages panel */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                   {(roomData.chat || []).length === 0 ? (
-                    <p className="text-xs text-slate-600 italic text-center my-auto">No messages yet. Say hi!</p>
+                    <p className={`text-xs italic text-center my-auto transition-colors ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>No messages yet. Say hi!</p>
                   ) : (
                     roomData.chat.map((msg) => {
                       const isMe = msg.senderId === user.uid;
                       return (
                         <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                           <div className="flex items-baseline gap-1.5">
-                            <span className="text-[10px] font-bold text-slate-200">{msg.senderName}</span>
-                            <span className="text-[8px] text-slate-600">
+                            <span className={`text-[10px] font-bold transition-colors ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{msg.senderName}</span>
+                            <span className={`text-[8px] transition-colors ${isDark ? 'text-slate-650' : 'text-slate-450'}`}>
                               {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
-                          <div className={`mt-0.5 max-w-[85%] px-3 py-1.5 rounded-2xl text-xs leading-normal ${isMe
-                            ? 'bg-[#2a2e37] text-slate-950 rounded-tr-none'
-                            : 'bg-slate-800 text-slate-200 rounded-tl-none'
-                            }`}>
+                          <div className={`mt-0.5 max-w-[85%] px-3 py-1.5 rounded-2xl text-xs leading-normal ${
+                            isMe
+                              ? isDark
+                                ? 'bg-slate-300 text-slate-950 rounded-tr-none'
+                                : 'bg-slate-200 text-slate-900 border border-slate-300 rounded-tr-none'
+                              : isDark
+                                ? 'bg-slate-800 text-slate-200 rounded-tl-none'
+                                : 'bg-white text-slate-800 border border-slate-200 rounded-tl-none'
+                          }`}>
                             {msg.text}
                           </div>
                         </div>
@@ -1857,18 +2080,28 @@ export default function App() {
                 </div>
 
                 {/* Submit text */}
-                <form onSubmit={sendChatMessage} className="bg-[#111317] border-t border-[#21252d] p-2 flex gap-2">
+                <form onSubmit={sendChatMessage} className={`border-t p-2 flex gap-2 transition-colors ${
+                  isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-100 border-slate-200'
+                }`}>
                   <input
                     type="text"
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
                     placeholder="Type message..."
-                    className="flex-1 bg-[#15181d] border border-[#21252d] hover:border-[#2d323f] focus:border-[#4f5666] focus:outline-none rounded-xl py-2 px-3 text-xs"
+                    className={`flex-1 focus:outline-none rounded-xl py-2 px-3 text-xs transition-colors border ${
+                      isDark 
+                        ? 'bg-[#15181d] border-[#21252d] hover:border-slate-700 focus:border-slate-500' 
+                        : 'bg-white border-slate-200 hover:border-slate-300 focus:border-slate-405 text-slate-800'
+                    }`}
                     maxLength={150}
                   />
                   <button
                     type="submit"
-                    className="bg-[#2a2e37] hover:bg-slate-400 text-slate-950 font-black text-xs px-4 rounded-xl transition"
+                    className={`font-black text-xs px-4 rounded-xl transition border ${
+                      isDark 
+                        ? 'bg-slate-350 hover:bg-slate-200 border-slate-400 text-slate-950' 
+                        : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-950'
+                    }`}
                   >
                     Send
                   </button>
@@ -1885,20 +2118,24 @@ export default function App() {
       {/* --- BLANK TILE CHARACTER SELECT MODAL --- */}
       {blankModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#15181d] border border-[#21252d] p-6 rounded-2xl max-w-sm w-full space-y-4 shadow-2xl text-center">
-            <h3 className="text-base font-extrabold text-slate-200 uppercase tracking-widest">
+          <div className={`p-6 rounded-2xl max-w-sm w-full space-y-4 shadow-2xl text-center border transition-colors ${
+            isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+          }`}>
+            <h3 className={`text-base font-extrabold uppercase tracking-widest transition-colors ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
               Choose Blank Tile Letter
             </h3>
-            <p className="text-xs text-slate-400">
+            <p className={`text-xs transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               Select which character this blank tile represents. Its point value will remain 0.
             </p>
 
-            <div className="grid grid-cols-6 gap-1.5 justify-center max-h-48 overflow-y-auto p-1 bg-[#111317]/60 rounded-xl">
+            <div className={`grid grid-cols-6 gap-1.5 justify-center max-h-48 overflow-y-auto p-2 rounded-xl transition-colors border ${
+              isDark ? 'bg-[#111317]/60 border-[#21252d]' : 'bg-slate-100 border-slate-200'
+            }`}>
               {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(char => (
                 <button
                   key={char}
                   onClick={() => selectBlankLetter(char)}
-                  className="bg-gradient-to-br from-amber-100 to-amber-200 hover:from-amber-200 hover:to-amber-300 border border-amber-300 text-slate-950 font-black py-2 rounded-lg text-sm transition transform active:scale-90"
+                  className="bg-gradient-to-br from-amber-100 to-amber-200 hover:from-amber-200 hover:to-amber-300 border border-amber-300 text-slate-955 font-black py-2 rounded-lg text-sm transition transform active:scale-90"
                 >
                   {char}
                 </button>
@@ -1910,7 +2147,11 @@ export default function App() {
                 setBlankModalOpen(false);
                 setPendingBlankCoords(null);
               }}
-              className="w-full bg-slate-800 hover:bg-slate-750 text-slate-300 py-2 rounded-xl text-xs font-bold transition"
+              className={`w-full py-2 rounded-xl text-xs font-bold transition border ${
+                isDark 
+                  ? 'bg-slate-700 hover:bg-slate-600 border-slate-600 text-white' 
+                  : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-800'
+              }`}
             >
               Cancel
             </button>
