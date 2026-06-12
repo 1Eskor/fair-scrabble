@@ -392,6 +392,7 @@ export default function App() {
       ],
       chat: [],
       turnIndex: 0,
+      consecutiveZeroTurns: 0,
       createdAt: Date.now()
     };
 
@@ -1081,6 +1082,40 @@ export default function App() {
     };
   };
 
+  const calculateEndgame = (currentPlayers, triggeringPlayerId, outOfTiles) => {
+    const updated = JSON.parse(JSON.stringify(currentPlayers));
+    let outBonus = 0;
+    const details = [];
+
+    Object.entries(updated).forEach(([uid, player]) => {
+      let deduction = 0;
+      player.rack.forEach(tile => {
+        deduction += tile.score;
+      });
+      player.score -= deduction;
+      
+      if (deduction > 0) {
+        details.push(`${player.name} lost ${deduction} pts for unplayed tiles.`);
+      }
+
+      if (uid !== triggeringPlayerId) {
+        outBonus += deduction;
+      }
+    });
+
+    if (outOfTiles && triggeringPlayerId && updated[triggeringPlayerId]) {
+      updated[triggeringPlayerId].score += outBonus;
+      if (outBonus > 0) {
+        details.push(`${updated[triggeringPlayerId].name} received a +${outBonus} pt bonus for going out!`);
+      }
+    }
+
+    return { 
+      players: updated, 
+      detailsStr: details.join(' ')
+    };
+  };
+
   // Submit words, increment scores, refill rack, toggle active user
   const handlePlayTurn = async () => {
     if (!roomData || !roomId) return;
@@ -1206,15 +1241,32 @@ export default function App() {
       points: turnPoints
     };
 
-    try {
-      await updateDoc(roomRef, {
-        board: updatedBoard,
-        players: updatedPlayers,
-        activePlayerId: otherPlayerId,
-        turnStartTime: Date.now(),
-        history: [...roomData.history, historyItem],
-        turnIndex: roomData.turnIndex + 1
+    const isGameOver = updatedRack.length === 0 && myDeck.length === 0;
+
+    let finalUpdateObj = {
+      board: updatedBoard,
+      players: updatedPlayers,
+      activePlayerId: otherPlayerId,
+      turnStartTime: Date.now(),
+      history: [...roomData.history, historyItem],
+      turnIndex: roomData.turnIndex + 1,
+      consecutiveZeroTurns: 0
+    };
+
+    if (isGameOver) {
+      const { players: finalPlayers, detailsStr } = calculateEndgame(updatedPlayers, user.uid, true);
+      finalUpdateObj.players = finalPlayers;
+      finalUpdateObj.status = 'finished';
+      finalUpdateObj.history.push({
+        id: Math.random().toString(),
+        timestamp: Date.now() + 1,
+        type: 'system',
+        message: `GAME OVER! ${myPlayer.name} used their last tile. ${detailsStr}`
       });
+    }
+
+    try {
+      await updateDoc(roomRef, finalUpdateObj);
 
       // Clear local placements
       setTentativePlaced({});
@@ -1241,13 +1293,31 @@ export default function App() {
       message: `${myPlayer.name} passed their turn.`
     };
 
-    try {
-      await updateDoc(roomRef, {
-        activePlayerId: otherPlayerId,
-        turnStartTime: Date.now(),
-        history: [...roomData.history, historyItem],
-        turnIndex: roomData.turnIndex + 1
+    const newConsecutiveZero = (roomData.consecutiveZeroTurns || 0) + 1;
+    const isGameOver = newConsecutiveZero >= 4;
+
+    let finalUpdateObj = {
+      activePlayerId: otherPlayerId,
+      turnStartTime: Date.now(),
+      history: [...roomData.history, historyItem],
+      turnIndex: roomData.turnIndex + 1,
+      consecutiveZeroTurns: newConsecutiveZero
+    };
+
+    if (isGameOver) {
+      const { players: finalPlayers, detailsStr } = calculateEndgame(roomData.players, null, false);
+      finalUpdateObj.players = finalPlayers;
+      finalUpdateObj.status = 'finished';
+      finalUpdateObj.history.push({
+        id: Math.random().toString(),
+        timestamp: Date.now() + 1,
+        type: 'system',
+        message: `GAME OVER! 4 consecutive zero-score turns passed. ${detailsStr}`
       });
+    }
+
+    try {
+      await updateDoc(roomRef, finalUpdateObj);
       recallAllTentative();
       showTemporarySuccess("You passed your turn.");
     } catch (err) {
@@ -1299,14 +1369,32 @@ export default function App() {
       deck: updatedDeck
     };
 
-    try {
-      await updateDoc(roomRef, {
-        players: updatedPlayers,
-        activePlayerId: otherPlayerId,
-        turnStartTime: Date.now(),
-        history: [...roomData.history, historyItem],
-        turnIndex: roomData.turnIndex + 1
+    const newConsecutiveZero = (roomData.consecutiveZeroTurns || 0) + 1;
+    const isGameOver = newConsecutiveZero >= 4;
+
+    let finalUpdateObj = {
+      players: updatedPlayers,
+      activePlayerId: otherPlayerId,
+      turnStartTime: Date.now(),
+      history: [...roomData.history, historyItem],
+      turnIndex: roomData.turnIndex + 1,
+      consecutiveZeroTurns: newConsecutiveZero
+    };
+
+    if (isGameOver) {
+      const { players: finalPlayers, detailsStr } = calculateEndgame(updatedPlayers, null, false);
+      finalUpdateObj.players = finalPlayers;
+      finalUpdateObj.status = 'finished';
+      finalUpdateObj.history.push({
+        id: Math.random().toString(),
+        timestamp: Date.now() + 1,
+        type: 'system',
+        message: `GAME OVER! 4 consecutive zero-score turns passed. ${detailsStr}`
       });
+    }
+
+    try {
+      await updateDoc(roomRef, finalUpdateObj);
 
       // Reset exchange state
       setExchangeMode(false);
@@ -1846,6 +1934,12 @@ export default function App() {
                         </div>
                       )}
                     </div>
+                  ) : roomData.status === 'finished' ? (
+                    <div className={`px-4 py-2 rounded-xl border text-sm font-black flex items-center gap-2 transition-colors shadow-lg ${
+                      isDark ? 'bg-indigo-900 border-indigo-700 text-indigo-100' : 'bg-indigo-100 border-indigo-300 text-indigo-800'
+                    }`}>
+                      🏆 GAME OVER
+                    </div>
                   ) : (
                     <div className={`border px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
                       isDark ? 'bg-[#111317] border-[#21252d] text-rose-400' : 'bg-rose-50 border-rose-200 text-rose-600'
@@ -2096,6 +2190,7 @@ export default function App() {
                     <button
                       type="button"
                       onFocus={(e) => e.target.blur()}
+                      disabled={roomData?.status === 'finished'}
                       onClick={() => {
                         setExchangeMode(true);
                         setSelectedExchangeIds([]);
@@ -2145,11 +2240,12 @@ export default function App() {
                     type="button"
                     onFocus={(e) => e.target.blur()}
                     onClick={shuffleRack}
+                    disabled={roomData?.status === 'finished'}
                     className={`font-bold py-2.5 px-3 rounded-xl text-xs transition border ${
                       isDark 
-                        ? 'bg-slate-600 hover:bg-slate-500 text-white border-slate-500' 
-                        : 'bg-slate-200 hover:bg-slate-300 text-slate-800 border-slate-300'
-                    }`}
+                        ? 'bg-slate-600 hover:bg-slate-500 text-white border-slate-500 disabled:bg-slate-800 disabled:border-slate-700 disabled:text-slate-500' 
+                        : 'bg-slate-200 hover:bg-slate-300 text-slate-800 border-slate-300 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     🔀 Shuffle Rack
                   </button>
@@ -2158,7 +2254,7 @@ export default function App() {
                     type="button"
                     onFocus={(e) => e.target.blur()}
                     onClick={recallAllTentative}
-                    disabled={Object.keys(tentativePlaced).length === 0}
+                    disabled={Object.keys(tentativePlaced).length === 0 || roomData?.status === 'finished'}
                     className={`font-bold py-2.5 px-3 rounded-xl text-xs transition border ${
                       isDark 
                         ? 'bg-slate-600 hover:bg-slate-500 text-white border-slate-500 disabled:bg-slate-800 disabled:border-slate-700 disabled:text-slate-500' 
@@ -2172,7 +2268,7 @@ export default function App() {
                     type="button"
                     onFocus={(e) => e.target.blur()}
                     onClick={handlePassTurn}
-                    disabled={!isMyTurn}
+                    disabled={!isMyTurn || roomData?.status === 'finished'}
                     className={`font-bold py-2.5 px-3 rounded-xl text-xs transition border ${
                       isDark 
                         ? 'bg-slate-600 hover:bg-slate-500 text-white border-slate-500 disabled:bg-slate-800 disabled:border-slate-700 disabled:text-slate-500' 
@@ -2186,7 +2282,7 @@ export default function App() {
                     type="button"
                     onFocus={(e) => e.target.blur()}
                     onClick={handlePlayTurn}
-                    disabled={!isMyTurn || Object.keys(tentativePlaced).length === 0}
+                    disabled={!isMyTurn || Object.keys(tentativePlaced).length === 0 || roomData?.status === 'finished'}
                     className={`col-span-2 md:col-span-1 font-black py-2.5 px-3 rounded-xl text-xs shadow-lg transition active:scale-95 border ${
                       isDark 
                         ? 'bg-slate-300 hover:bg-slate-200 text-slate-955 border-slate-400 disabled:bg-slate-800 disabled:border-slate-700 disabled:text-slate-550' 
