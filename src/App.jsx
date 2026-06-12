@@ -1110,6 +1110,13 @@ export default function App() {
       }
     }
 
+    const playerList = Object.values(updated).sort((a, b) => b.score - a.score);
+    if (playerList.length >= 2) {
+      const winner = playerList[0];
+      const loser = playerList[1];
+      details.push(`\n\nTHE CHAMP IS HERE. THE CHAMP IS HERE. ${winner.name} is the winner.\n${loser.name} is garbage.`);
+    }
+
     return { 
       players: updated, 
       detailsStr: details.join(' ')
@@ -1294,7 +1301,7 @@ export default function App() {
     };
 
     const newConsecutiveZero = (roomData.consecutiveZeroTurns || 0) + 1;
-    const isGameOver = newConsecutiveZero >= 4;
+    const isGameOver = newConsecutiveZero >= 6;
 
     let finalUpdateObj = {
       activePlayerId: otherPlayerId,
@@ -1312,7 +1319,7 @@ export default function App() {
         id: Math.random().toString(),
         timestamp: Date.now() + 1,
         type: 'system',
-        message: `GAME OVER! 4 consecutive zero-score turns passed. ${detailsStr}`
+        message: `GAME OVER! 6 consecutive zero-score turns passed. ${detailsStr}`
       });
     }
 
@@ -1370,7 +1377,7 @@ export default function App() {
     };
 
     const newConsecutiveZero = (roomData.consecutiveZeroTurns || 0) + 1;
-    const isGameOver = newConsecutiveZero >= 4;
+    const isGameOver = newConsecutiveZero >= 6;
 
     let finalUpdateObj = {
       players: updatedPlayers,
@@ -1389,7 +1396,7 @@ export default function App() {
         id: Math.random().toString(),
         timestamp: Date.now() + 1,
         type: 'system',
-        message: `GAME OVER! 4 consecutive zero-score turns passed. ${detailsStr}`
+        message: `GAME OVER! 6 consecutive zero-score turns passed. ${detailsStr}`
       });
     }
 
