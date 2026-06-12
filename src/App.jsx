@@ -1180,7 +1180,7 @@ export default function App() {
     }`}>
 
       {/* --- HEADER --- */}
-      <header className={`border-b shadow-xl py-4 px-6 sticky top-0 z-30 transition-colors duration-200 ${
+      <header className={`border-b shadow-xl py-4 px-6 z-30 transition-colors duration-200 ${
         isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
       }`}>
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
