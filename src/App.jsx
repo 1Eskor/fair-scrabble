@@ -249,6 +249,26 @@ export default function App() {
   const chatContainerRef = useRef(null);
   const prevChatLengthRef = useRef(0);
 
+  // SOWPODS Dictionary Loading
+  const [dictLoaded, setDictLoaded] = useState(false);
+
+  useEffect(() => {
+    const loadDict = async () => {
+      try {
+        const res = await fetch('/sowpods.txt');
+        if (res.ok) {
+          const text = await res.text();
+          const words = text.split(/\r?\n/).map(w => w.trim().toUpperCase()).filter(w => w.length > 0);
+          window.SOWPODS_DICT = new Set(words);
+          setDictLoaded(true);
+        }
+      } catch (err) {
+        console.error("Failed to load dictionary:", err);
+      }
+    };
+    loadDict();
+  }, []);
+
   // --- SIGN IN AND RUN AUTH (RULE 3) ---
   useEffect(() => {
     const initAuth = async () => {
@@ -1080,18 +1100,13 @@ export default function App() {
 
     // Handle Dictionary Validation if in Strict mode
     if (roomData.validationMode === 'strict') {
-      // Validate all words synchronously against standard spellcheck or online checker
-      // To provide extreme reliability, we let users "Self-Challenge" or run API validations.
-      // In strict mode, we'll verify online via dictionary api.
-      setError("Verifying words with online dictionary dictionaryapi.dev...");
-      try {
-        const wordValidity = new Map();
-        for (const w of scoreData.words) {
-          const isValid = await checkWordOnline(w.forwardWord) ||
-            (roomData.backwardsAllowed && await checkWordOnline(w.backwardWord)) ||
-            (roomData.diagonalBackwardsAllowed && await checkWordOnline(w.backwardWord));
-          wordValidity.set(w, isValid);
-        }
+      const wordValidity = new Map();
+      for (const w of scoreData.words) {
+        const isValid = checkWordLocal(w.forwardWord) ||
+          (roomData.backwardsAllowed && checkWordLocal(w.backwardWord)) ||
+          (roomData.diagonalBackwardsAllowed && checkWordLocal(w.backwardWord));
+        wordValidity.set(w, isValid);
+      }
 
         for (const w of scoreData.words) {
           if (!wordValidity.get(w)) {
@@ -1119,9 +1134,6 @@ export default function App() {
             }
           }
         }
-      } catch (err) {
-        setError("Word verification API timed out. Proceeding using self-judge validation.");
-      }
     }
 
     // Success! Update Firestore room
@@ -1159,10 +1171,19 @@ export default function App() {
     const turnPoints = scoreData.totalScore;
     const finalScore = myPlayer.score + turnPoints;
 
-    const wordsPlacedStr = scoreData.words.map(w => {
-      // Check if word was read backwards
-      return `"${w.forwardWord}" (${w.score} pts)`;
-    }).join(', ');
+    // Fetch definitions for history asynchronously
+    const wordsWithDefs = await Promise.all(scoreData.words.map(async (w) => {
+      let validWord = w.forwardWord;
+      if (!checkWordLocal(w.forwardWord) && (roomData.backwardsAllowed || roomData.diagonalBackwardsAllowed) && checkWordLocal(w.backwardWord)) {
+        validWord = w.backwardWord;
+      }
+      const def = await fetchWordDefinition(validWord);
+      if (def) {
+        return `"${validWord}" (${w.score} pts): ${def}`;
+      }
+      return `"${validWord}" (${w.score} pts)`;
+    }));
+    const wordsPlacedStr = wordsWithDefs.join(' | ');
 
     const bingoMsg = scoreData.bingoBonus > 0 ? ` BINGO (+${scoreData.bingoBonus} pts)!` : '';
     const turnMessage = `${myPlayer.name} played ${wordsPlacedStr} for a total of ${turnPoints} pts.${bingoMsg}`;
@@ -1298,14 +1319,24 @@ export default function App() {
   };
 
   // Dictionary lookup function
-  const checkWordOnline = async (word) => {
+  const checkWordLocal = (word) => {
     if (!word || word.length < 2) return false;
+    if (window.SOWPODS_DICT) {
+      return window.SOWPODS_DICT.has(word.toUpperCase());
+    }
+    // Fallback if dictionary failed to load
+    return true; 
+  };
+
+  const fetchWordDefinition = async (word) => {
     try {
       const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word.toLowerCase()}`);
-      return res.ok;
-    } catch (e) {
-      return false;
-    }
+      if (res.ok) {
+        const data = await res.json();
+        return data[0]?.meanings?.[0]?.definitions?.[0]?.definition || null;
+      }
+    } catch (e) {}
+    return null;
   };
 
   const handleDictCheck = async (e) => {
@@ -1315,14 +1346,18 @@ export default function App() {
     setDictResult(null);
 
     const lookup = dictWord.trim().toLowerCase();
-    try {
-      const ok = await checkWordOnline(lookup);
-      setDictResult({ word: lookup, valid: ok });
-    } catch (err) {
-      setDictResult({ word: lookup, valid: false, error: true });
-    } finally {
-      setDictChecking(false);
+    
+    // 1. Instant local validation
+    const isValid = checkWordLocal(lookup);
+    
+    // 2. Fetch definition if valid
+    let def = null;
+    if (isValid) {
+      def = await fetchWordDefinition(lookup);
     }
+
+    setDictResult({ word: lookup, valid: isValid, definition: def, error: !isValid && !window.SOWPODS_DICT });
+    setDictChecking(false);
   };
 
   // Helper messages UI
@@ -2263,7 +2298,7 @@ export default function App() {
               <div className={`border p-4 rounded-2xl shadow-xl space-y-3 transition-colors ${
                 isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
               }`}>
-                <h3 className={`text-sm font-bold uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400' : 'text-slate-505'}`}>📚 Online Dictionary Lookup</h3>
+                <h3 className={`text-sm font-bold uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400' : 'text-slate-505'}`}>📚 SOWPODS Dictionary Lookup</h3>
                 <form onSubmit={handleDictCheck} className="flex gap-2">
                   <input
                     type="text"
@@ -2289,16 +2324,25 @@ export default function App() {
                 </form>
 
                 {dictResult && (
-                  <div className={`p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between border ${
-                    dictResult.valid
-                      ? isDark 
-                        ? 'bg-[#132a1d]/50 border-[#1d422b]/60 text-emerald-300' 
-                        : 'bg-emerald-50 border-emerald-250 text-emerald-700'
-                      : isDark 
-                        ? 'bg-[#2a1313]/50 border-[#421d1d]/60 text-rose-350' 
-                        : 'bg-rose-50 border-rose-250 text-rose-700'
-                  }`}>
-                    <span>"{dictResult.word.toUpperCase()}" {dictResult.valid ? 'is a VALID English Word ✅' : 'is NOT in Dictionary ❌'}</span>
+                  <div className="space-y-2">
+                    <div className={`p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between border ${
+                      dictResult.valid
+                        ? isDark 
+                          ? 'bg-[#132a1d]/50 border-[#1d422b]/60 text-emerald-300' 
+                          : 'bg-emerald-50 border-emerald-250 text-emerald-700'
+                        : isDark 
+                          ? 'bg-[#2a1313]/50 border-[#421d1d]/60 text-rose-350' 
+                          : 'bg-rose-50 border-rose-250 text-rose-700'
+                    }`}>
+                      <span>"{dictResult.word.toUpperCase()}" {dictResult.valid ? 'is a VALID English Word ✅' : 'is NOT in Dictionary ❌'}</span>
+                    </div>
+                    {dictResult.valid && dictResult.definition && (
+                      <div className={`p-2 rounded-lg text-xs italic border ${
+                        isDark ? 'bg-slate-800/50 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-600'
+                      }`}>
+                        <strong>Def:</strong> {dictResult.definition}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
