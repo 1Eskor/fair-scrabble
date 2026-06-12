@@ -244,7 +244,7 @@ export default function App() {
   const [dictResult, setDictResult] = useState(null);
   const [dictChecking, setDictChecking] = useState(false);
 
-  const chatEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
 
   // --- SIGN IN AND RUN AUTH (RULE 3) ---
   useEffect(() => {
@@ -299,8 +299,13 @@ export default function App() {
 
   // Scroll chat to bottom
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [roomData?.chat]);
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }, [roomData?.chat?.length]);
 
   // Save nickname
   const saveNickname = (name) => {
@@ -2047,7 +2052,7 @@ export default function App() {
                 </div>
 
                 {/* Messages panel */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3">
                   {(roomData.chat || []).length === 0 ? (
                     <p className={`text-xs italic text-center my-auto transition-colors ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>No messages yet. Say hi!</p>
                   ) : (
@@ -2076,7 +2081,7 @@ export default function App() {
                       );
                     })
                   )}
-                  <div ref={chatEndRef} />
+
                 </div>
 
                 {/* Submit text */}
