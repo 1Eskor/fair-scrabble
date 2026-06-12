@@ -227,6 +227,8 @@ export default function App() {
   const [backwardsAllowed, setBackwardsAllowed] = useState(false);
   const [diagonalBackwardsAllowed, setDiagonalBackwardsAllowed] = useState(false);
   const [validationMode, setValidationMode] = useState('manual');
+  const [timerEnabled, setTimerEnabled] = useState(false);
+  const [timerDuration, setTimerDuration] = useState(90);
   const [joinInput, setJoinInput] = useState('');
 
   // Local Game State
@@ -343,6 +345,9 @@ export default function App() {
       backwardsAllowed: config.backwardsAllowed,
       diagonalBackwardsAllowed: config.diagonalBackwardsAllowed,
       validationMode: config.validationMode, // 'strict' or 'manual'
+      timerEnabled: config.timerEnabled,
+      timerDuration: config.timerDuration,
+      turnStartTime: Date.now(),
       status: 'waiting',
       players: {
         [user.uid]: {
@@ -445,6 +450,7 @@ export default function App() {
         players: finalPlayers,
         playerOrder: updatedOrder,
         status: 'playing',
+        turnStartTime: Date.now(),
         history: [
           ...data.history,
           {
@@ -1184,6 +1190,7 @@ export default function App() {
         board: updatedBoard,
         players: updatedPlayers,
         activePlayerId: otherPlayerId,
+        turnStartTime: Date.now(),
         history: [...roomData.history, historyItem],
         turnIndex: roomData.turnIndex + 1
       });
@@ -1216,6 +1223,7 @@ export default function App() {
     try {
       await updateDoc(roomRef, {
         activePlayerId: otherPlayerId,
+        turnStartTime: Date.now(),
         history: [...roomData.history, historyItem],
         turnIndex: roomData.turnIndex + 1
       });
@@ -1274,6 +1282,7 @@ export default function App() {
       await updateDoc(roomRef, {
         players: updatedPlayers,
         activePlayerId: otherPlayerId,
+        turnStartTime: Date.now(),
         history: [...roomData.history, historyItem],
         turnIndex: roomData.turnIndex + 1
       });
@@ -1343,6 +1352,29 @@ export default function App() {
 
   // Real-time placement scoring evaluation
   const scoreReport = roomData ? getFormedWordsAndScores() : null;
+
+  // Turn Timer Logic
+  const [remainingTime, setRemainingTime] = useState(0);
+
+  useEffect(() => {
+    if (!roomData || roomData.status !== 'playing' || !roomData.timerEnabled) return;
+
+    const tick = () => {
+      const start = roomData.turnStartTime || Date.now();
+      const passed = Math.floor((Date.now() - start) / 1000);
+      const left = Math.max(0, roomData.timerDuration - passed);
+      setRemainingTime(left);
+
+      // Auto-pass if time is up and it is MY turn
+      if (left === 0 && roomData.activePlayerId === user?.uid) {
+        handlePassTurn();
+      }
+    };
+
+    tick();
+    const intervalId = setInterval(tick, 1000);
+    return () => clearInterval(intervalId);
+  }, [roomData?.status, roomData?.timerEnabled, roomData?.turnStartTime, roomData?.timerDuration, roomData?.activePlayerId, user?.uid]);
 
   // Responsive Board Calculations
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 768);
@@ -1592,6 +1624,45 @@ export default function App() {
                 <div className="space-y-2">
                   <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${
                     isDark ? 'text-slate-400' : 'text-slate-500'
+                  }`}>Turn Timer</label>
+                  <div className={`p-4 rounded-xl border flex flex-col gap-3 transition-colors ${
+                    isDark ? 'bg-[#111317]/50 border-[#21252d]' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <label className={`flex items-center justify-between cursor-pointer transition ${
+                      isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-200/40'
+                    }`}>
+                      <span className="text-sm font-medium">Enable Timer</span>
+                      <input
+                        type="checkbox"
+                        checked={timerEnabled}
+                        onChange={(e) => setTimerEnabled(e.target.checked)}
+                        className="accent-slate-500 h-4 w-4"
+                      />
+                    </label>
+                    {timerEnabled && (
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-700/30">
+                        <span className="text-sm font-medium">Time per Turn:</span>
+                        <select
+                          value={timerDuration}
+                          onChange={(e) => setTimerDuration(Number(e.target.value))}
+                          className={`text-sm rounded-lg p-1.5 border font-bold ${
+                            isDark ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
+                        >
+                          <option value={30}>30 Seconds</option>
+                          <option value={60}>60 Seconds</option>
+                          <option value={90}>90 Seconds</option>
+                          <option value={120}>2 Minutes</option>
+                          <option value={180}>3 Minutes</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${
+                    isDark ? 'text-slate-400' : 'text-slate-500'
                   }`}>Spell Check Mode</label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -1626,7 +1697,9 @@ export default function App() {
                     diagonalAllowed,
                     backwardsAllowed,
                     diagonalBackwardsAllowed,
-                    validationMode
+                    validationMode,
+                    timerEnabled,
+                    timerDuration
                   })}
                   className={`w-full font-black text-sm py-3 px-4 rounded-xl shadow-lg transition active:scale-[0.98] border ${
                     isDark 
@@ -1704,21 +1777,33 @@ export default function App() {
                 {/* Match Status / Turn indicator */}
                 <div className="flex items-center gap-3">
                   {roomData.status === 'playing' ? (
-                    <div className={`px-4 py-2 rounded-xl border text-sm font-bold flex items-center gap-2 transition-colors ${
-                      isMyTurn
-                        ? isDark
-                          ? 'bg-slate-800 border-slate-600 text-white animate-pulse'
-                          : 'bg-amber-50 border-amber-300 text-amber-850 animate-pulse'
-                        : isDark
-                          ? 'bg-[#111317] border-[#21252d] text-slate-400'
-                          : 'bg-slate-50 border-slate-200 text-slate-500'
-                    }`}>
-                      <span className={`w-2 h-2 rounded-full ${
-                        isMyTurn 
-                          ? isDark ? 'bg-slate-300' : 'bg-amber-500' 
-                          : isDark ? 'bg-slate-600' : 'bg-slate-400'
-                      }`}></span>
-                      {isMyTurn ? "Your Turn!" : `${roomData.players[roomData.activePlayerId]?.name || "Opponent"}'s Turn`}
+                    <div className="flex items-center gap-2">
+                      <div className={`px-4 py-2 rounded-xl border text-sm font-bold flex items-center gap-2 transition-colors ${
+                        isMyTurn
+                          ? isDark
+                            ? 'bg-slate-800 border-slate-600 text-white animate-pulse'
+                            : 'bg-amber-50 border-amber-300 text-amber-850 animate-pulse'
+                          : isDark
+                            ? 'bg-[#111317] border-[#21252d] text-slate-400'
+                            : 'bg-slate-50 border-slate-200 text-slate-500'
+                      }`}>
+                        <span className={`w-2 h-2 rounded-full ${
+                          isMyTurn 
+                            ? isDark ? 'bg-slate-300' : 'bg-amber-500' 
+                            : isDark ? 'bg-slate-600' : 'bg-slate-400'
+                        }`}></span>
+                        {isMyTurn ? "Your Turn!" : `${roomData.players[roomData.activePlayerId]?.name || "Opponent"}'s Turn`}
+                      </div>
+                      
+                      {roomData.timerEnabled && (
+                        <div className={`px-3 py-2 rounded-xl border text-sm font-bold flex items-center gap-2 transition-colors ${
+                          remainingTime <= 10 
+                            ? 'bg-rose-500/20 border-rose-500/50 text-rose-500 animate-pulse' 
+                            : isDark ? 'bg-[#111317] border-[#21252d] text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                        }`}>
+                          ⏳ {Math.floor(remainingTime / 60)}:{(remainingTime % 60).toString().padStart(2, '0')}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className={`border px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
