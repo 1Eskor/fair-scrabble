@@ -875,11 +875,13 @@ export default function App() {
           });
 
           const totalWordScore = score * wordMultiplier;
+          const normAxis = normalizeDirection({ dr: axis.dr, dc: axis.dc });
           formedWordsList.push({
             cells: wordCells,
             forwardWord: normalString,
             backwardWord: backwardString,
-            score: totalWordScore
+            score: totalWordScore,
+            axis: normAxis
           });
         }
       }
@@ -892,6 +894,50 @@ export default function App() {
       if (roomData.gridSize === 15) bingoBonus = 50;
       else if (roomData.gridSize === 17) bingoBonus = 60;
       else bingoBonus = 70;
+    }
+
+    // --- 2-AXIS RULE VALIDATION ---
+    const isFirstMove = Object.keys(roomData.board).length === 0;
+    if (formedWordsList.length > 0 && !isFirstMove) {
+      // 1. Identify the main word of this play
+      let mainWord = null;
+      if (coords.length > 1) {
+        // Multi-tile plays: main word is the one matching the placement axis
+        const mainAxis = normalizeDirection(direction);
+        mainWord = formedWordsList.find(w => w.axis.dr === mainAxis.dr && w.axis.dc === mainAxis.dc);
+      } else {
+        // Single-tile plays: main word is the longest formed word
+        let maxLen = 0;
+        formedWordsList.forEach(w => {
+          if (w.forwardWord.length > maxLen) {
+            maxLen = w.forwardWord.length;
+            mainWord = w;
+          }
+        });
+      }
+
+      if (mainWord) {
+        const mainWordLen = mainWord.forwardWord.length;
+        if (mainWordLen >= 3) {
+          // Check if at least one cell of mainWord is shared with another word on a different axis
+          const hasCrossAxisConnection = formedWordsList.some(w => {
+            const isDifferentAxis = (w.axis.dr !== mainWord.axis.dr || w.axis.dc !== mainWord.axis.dc);
+            if (!isDifferentAxis) return false;
+
+            const sharesCell = w.cells.some(wc => 
+              mainWord.cells.some(mc => mc.r === wc.r && mc.c === wc.c)
+            );
+            return sharesCell;
+          });
+
+          if (!hasCrossAxisConnection) {
+            return {
+              words: [],
+              error: `2-Axis Rule: The ${mainWordLen}-letter main word "${mainWord.forwardWord}" must connect to at least one word on a different axis.`
+            };
+          }
+        }
+      }
     }
 
     return {
