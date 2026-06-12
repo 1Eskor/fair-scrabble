@@ -1887,54 +1887,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Lobby Pre-select State Holders (Kept at bottom block of file for simplicity) */}
-      {(() => {
-        const [selectedGridSize, setSelectedGridSize] = useState(15);
-        const [diagonalAllowed, setDiagonalAllowed] = useState(false);
-        const [backwardsAllowed, setBackwardsAllowed] = useState(false);
-        const [diagonalBackwardsAllowed, setDiagonalBackwardsAllowed] = useState(false);
-        const [validationMode, setValidationMode] = useState('manual');
-        const [joinInput, setJoinInput] = useState('');
-
-        // Exposing these states inside the global window scope to bypass React block scope issues
-        useEffect(() => {
-          window._setLobbyState = {
-            selectedGridSize, setSelectedGridSize,
-            diagonalAllowed, setDiagonalAllowed,
-            backwardsAllowed, setBackwardsAllowed,
-            diagonalBackwardsAllowed, setDiagonalBackwardsAllowed,
-            validationMode, setValidationMode,
-            joinInput, setJoinInput
-          };
-        }, [selectedGridSize, diagonalAllowed, backwardsAllowed, diagonalBackwardsAllowed, validationMode, joinInput]);
-      })()}
-
     </div>
   );
 }
-
-// Helper wrapper to safely let outer scoped variables interact
-let extSetGridSize = 15;
-let extSetDiag = false;
-let extSetBack = false;
-let extSetDiagBack = false;
-let extSetVal = 'manual';
-let extSetJoin = '';
-
-const setSelectedGridSize = (val) => { if (window._setLobbyState) { window._setLobbyState.setSelectedGridSize(val); } };
-const selectedGridSize = typeof window !== 'undefined' && window._setLobbyState ? window._setLobbyState.selectedGridSize : 15;
-
-const setDiagonalAllowed = (val) => { if (window._setLobbyState) { window._setLobbyState.setDiagonalAllowed(val); } };
-const diagonalAllowed = typeof window !== 'undefined' && window._setLobbyState ? window._setLobbyState.diagonalAllowed : false;
-
-const setBackwardsAllowed = (val) => { if (window._setLobbyState) { window._setLobbyState.setBackwardsAllowed(val); } };
-const backwardsAllowed = typeof window !== 'undefined' && window._setLobbyState ? window._setLobbyState.backwardsAllowed : false;
-
-const setDiagonalBackwardsAllowed = (val) => { if (window._setLobbyState) { window._setLobbyState.setDiagonalBackwardsAllowed(val); } };
-const diagonalBackwardsAllowed = typeof window !== 'undefined' && window._setLobbyState ? window._setLobbyState.diagonalBackwardsAllowed : false;
-
-const setValidationMode = (val) => { if (window._setLobbyState) { window._setLobbyState.setValidationMode(val); } };
-const validationMode = typeof window !== 'undefined' && window._setLobbyState ? window._setLobbyState.validationMode : 'manual';
-
-const setJoinInput = (val) => { if (window._setLobbyState) { window._setLobbyState.setJoinInput(val); } };
-const joinInput = typeof window !== 'undefined' && window._setLobbyState ? window._setLobbyState.joinInput : '';
