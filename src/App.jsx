@@ -51,7 +51,7 @@ const shuffleArray = (array) => {
 };
 
 // --- EVEN TILE DISTRIBUTION ALGORITHM ---
-const generateEvenDecks = (gridSize, numPlayers = 2) => {
+const generateEvenDecks = (gridSize, numPlayers = 2, evenDistributionMode = false) => {
   let playerSpecials = []; 
   let playerBlanksCount = 0;
   let playerSCount = 0;
@@ -91,6 +91,7 @@ const generateEvenDecks = (gridSize, numPlayers = 2) => {
 
   if (numPlayers === 3) {
     playerBlanksCount = 3; // 1 blank per player
+    playerSCount = 3; // 1 S per player
     const pool = ['Q', 'Z', 'J', 'X'];
     // Give exactly 6 random specials total (2 per player)
     playerSpecials = [
@@ -100,13 +101,6 @@ const generateEvenDecks = (gridSize, numPlayers = 2) => {
     ];
   }
 
-  let standards = [];
-  Object.entries(standardLettersPool).forEach(([letter, qty]) => {
-    for (let i = 0; i < qty; i++) {
-      standards.push(letter);
-    }
-  });
-  standards = shuffleArray(standards);
   const shuffledSpecials = shuffleArray(playerSpecials);
 
   const decks = Array.from({ length: numPlayers }, () => []);
@@ -133,7 +127,31 @@ const generateEvenDecks = (gridSize, numPlayers = 2) => {
   const esses = Array.from({ length: playerSCount }, () => 'S');
   dealToDecks(esses, letter => ({ id: Math.random().toString(), letter, score: 1 }));
 
-  dealToDecks(standards, letter => ({ id: Math.random().toString(), letter, score: getTileScore(letter) }));
+  if (evenDistributionMode) {
+    let remainderPool = [];
+    Object.entries(standardLettersPool).forEach(([letter, qty]) => {
+      const perPlayer = Math.floor(qty / numPlayers);
+      const remainder = qty % numPlayers;
+      
+      for (let i = 0; i < perPlayer * numPlayers; i++) {
+        decks[i % numPlayers].push({ id: Math.random().toString(), letter, score: getTileScore(letter) });
+      }
+      for (let i = 0; i < remainder; i++) {
+        remainderPool.push(letter);
+      }
+    });
+    remainderPool = shuffleArray(remainderPool);
+    dealToDecks(remainderPool, letter => ({ id: Math.random().toString(), letter, score: getTileScore(letter) }));
+  } else {
+    let standards = [];
+    Object.entries(standardLettersPool).forEach(([letter, qty]) => {
+      for (let i = 0; i < qty; i++) {
+        standards.push(letter);
+      }
+    });
+    standards = shuffleArray(standards);
+    dealToDecks(standards, letter => ({ id: Math.random().toString(), letter, score: getTileScore(letter) }));
+  }
 
   const resultDecks = {};
   decks.forEach((deck, idx) => {
@@ -228,6 +246,7 @@ export default function App() {
   const [timerEnabled, setTimerEnabled] = useState(false);
   const [timerDuration, setTimerDuration] = useState(90);
   const [threePlayerMode, setThreePlayerMode] = useState(false);
+  const [evenDistributionMode, setEvenDistributionMode] = useState(false);
   const [joinInput, setJoinInput] = useState('');
 
   // Local Game State
@@ -354,7 +373,7 @@ export default function App() {
     const newRoomId = Math.random().toString(36).substring(2, 7).toUpperCase();
     
     const maxPlayers = config.threePlayerMode ? 3 : 2;
-    const decks = generateEvenDecks(gridSize, maxPlayers);
+    const decks = generateEvenDecks(gridSize, maxPlayers, config.evenDistributionMode);
 
     const rackSize = gridSize === 15 ? 7 : (gridSize === 17 ? 8 : 9);
 
@@ -363,6 +382,7 @@ export default function App() {
       gridSize,
       rackSize,
       maxPlayers,
+      evenDistributionMode: !!config.evenDistributionMode,
       diagonalAllowed: config.diagonalAllowed,
       backwardsAllowed: config.backwardsAllowed,
       diagonalBackwardsAllowed: config.diagonalBackwardsAllowed,
@@ -1855,6 +1875,26 @@ export default function App() {
                 <div className="space-y-2">
                   <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${
                     isDark ? 'text-slate-400' : 'text-slate-500'
+                  }`}>Tile Distribution</label>
+                  <div className={`flex items-center justify-between p-3 rounded-xl border transition-colors cursor-pointer ${
+                    isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-50 border-slate-200'
+                  }`} onClick={() => setEvenDistributionMode(!evenDistributionMode)}>
+                    <span className={`text-sm font-bold flex items-center gap-2 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                      ⚖️ Even Distribution
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={evenDistributionMode}
+                      onChange={(e) => setEvenDistributionMode(e.target.checked)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="accent-slate-500 h-4 w-4"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${
+                    isDark ? 'text-slate-400' : 'text-slate-500'
                   }`}>Spell Check Mode</label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -1892,11 +1932,12 @@ export default function App() {
                     validationMode,
                     timerEnabled,
                     timerDuration,
-                    threePlayerMode
+                    threePlayerMode,
+                    evenDistributionMode
                   })}
                   className={`w-full font-black text-sm py-3 px-4 rounded-xl shadow-lg transition active:scale-[0.98] border ${
                     isDark 
-                      ? 'bg-slate-350 hover:bg-slate-200 border-slate-400 text-slate-950' 
+                      ? 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-900' 
                       : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-950'
                   }`}
                 >
@@ -1927,7 +1968,7 @@ export default function App() {
                     onClick={() => handleJoinRoom(joinInput)}
                     className={`font-black px-6 py-3 rounded-xl shadow-md transition active:scale-[0.98] border ${
                       isDark 
-                        ? 'bg-slate-350 hover:bg-slate-200 border-slate-400 text-slate-950' 
+                        ? 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-900' 
                         : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-950'
                     }`}
                   >
@@ -2599,7 +2640,7 @@ export default function App() {
                     type="submit"
                     className={`font-black text-xs px-4 rounded-xl transition border ${
                       isDark 
-                        ? 'bg-slate-350 hover:bg-slate-200 border-slate-400 text-slate-950' 
+                        ? 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-900' 
                         : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-950'
                     }`}
                   >
