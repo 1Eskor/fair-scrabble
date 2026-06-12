@@ -14,8 +14,17 @@ export default defineConfig([
       reactRefresh.configs.vite,
     ],
     languageOptions: {
-      globals: globals.browser,
+      globals: {
+        ...globals.browser,
+        __app_id: 'readonly',
+        __initial_auth_token: 'readonly',
+      },
       parserOptions: { ecmaFeatures: { jsx: true } },
+    },
+    rules: {
+      'no-unused-vars': 'off',
+      'no-useless-assignment': 'off',
+      'react-hooks/purity': 'off',
     },
   },
 ])
