@@ -1641,20 +1641,28 @@ export default function App() {
                     </label>
                     {timerEnabled && (
                       <div className="flex items-center justify-between pt-2 border-t border-slate-700/30">
-                        <span className="text-sm font-medium">Time per Turn:</span>
-                        <select
+                        <span className="text-sm font-medium">Seconds (15-300):</span>
+                        <input
+                          type="number"
+                          min="15"
+                          max="300"
                           value={timerDuration}
-                          onChange={(e) => setTimerDuration(Number(e.target.value))}
-                          className={`text-sm rounded-lg p-1.5 border font-bold ${
+                          onChange={(e) => {
+                            let val = parseInt(e.target.value, 10);
+                            if (isNaN(val)) val = 15;
+                            // We allow typing without strict bounds on every keystroke, but we'll clamp it on blur or let standard validation handle it.
+                            // Actually it's better to just clamp it on change or let HTML min/max handle it.
+                            setTimerDuration(val);
+                          }}
+                          onBlur={(e) => {
+                            let val = parseInt(e.target.value, 10);
+                            if (isNaN(val) || val < 15) setTimerDuration(15);
+                            else if (val > 300) setTimerDuration(300);
+                          }}
+                          className={`text-sm rounded-lg p-1.5 border font-bold w-20 text-center ${
                             isDark ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-800'
                           }`}
-                        >
-                          <option value={30}>30 Seconds</option>
-                          <option value={60}>60 Seconds</option>
-                          <option value={90}>90 Seconds</option>
-                          <option value={120}>2 Minutes</option>
-                          <option value={180}>3 Minutes</option>
-                        </select>
+                        />
                       </div>
                     )}
                   </div>
@@ -1797,11 +1805,9 @@ export default function App() {
                       
                       {roomData.timerEnabled && (
                         <div className={`px-3 py-2 rounded-xl border text-sm font-bold flex items-center gap-2 transition-colors ${
-                          remainingTime <= 10 
-                            ? 'bg-rose-500/20 border-rose-500/50 text-rose-500 animate-pulse' 
-                            : isDark ? 'bg-[#111317] border-[#21252d] text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                          isDark ? 'bg-[#111317] border-[#21252d] text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
                         }`}>
-                          ⏳ {Math.floor(remainingTime / 60)}:{(remainingTime % 60).toString().padStart(2, '0')}
+                          ⏳ {remainingTime}s
                         </div>
                       )}
                     </div>
