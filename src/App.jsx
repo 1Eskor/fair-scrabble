@@ -772,6 +772,14 @@ export default function App() {
     const { coords, direction } = validation;
     const formedWordsList = [];
 
+    const normalizeDirection = (dir) => {
+      if (!dir) return dir;
+      if (dir.dc > 0) return dir;
+      if (dir.dc < 0) return { dr: -dir.dr, dc: -dir.dc };
+      if (dir.dr > 0) return dir;
+      return { dr: -dir.dr, dc: -dir.dc };
+    };
+
     // Direction candidates for searching words
     // If we only placed 1 tile, we must scan ALL axes (horizontal, vertical, and diagonals if enabled)
     // If we placed multiple, we check the primary axis of placement, plus perpendicular axes for each tile
@@ -783,11 +791,11 @@ export default function App() {
       ];
       if (roomData.diagonalAllowed || roomData.diagonalBackwardsAllowed) {
         axesToScan.push({ dr: 1, dc: 1 });
-        axesToScan.push({ dr: 1, dc: -1 });
+        axesToScan.push({ dr: -1, dc: 1 });
       }
     } else {
       // Primary axis
-      axesToScan.push(direction);
+      axesToScan.push(normalizeDirection(direction));
       // Scan all potential perpendicular crossing axes for each placed tile
       const possibleDirs = [
         { dr: 0, dc: 1 }, // Horizontal
@@ -795,15 +803,16 @@ export default function App() {
       ];
       if (roomData.diagonalAllowed || roomData.diagonalBackwardsAllowed) {
         possibleDirs.push({ dr: 1, dc: 1 });
-        possibleDirs.push({ dr: 1, dc: -1 });
+        possibleDirs.push({ dr: -1, dc: 1 });
       }
 
       coords.forEach(co => {
         possibleDirs.forEach(dir => {
-          const isPrimaryDir = (dir.dr === direction.dr && dir.dc === direction.dc) ||
-                               (dir.dr === -direction.dr && dir.dc === -direction.dc);
+          const normDir = normalizeDirection(dir);
+          const normPrimary = normalizeDirection(direction);
+          const isPrimaryDir = (normDir.dr === normPrimary.dr && normDir.dc === normPrimary.dc);
           if (!isPrimaryDir) {
-            axesToScan.push({ dr: dir.dr, dc: dir.dc, fromCoord: co });
+            axesToScan.push({ dr: normDir.dr, dc: normDir.dc, fromCoord: co });
           }
         });
       });
@@ -1589,7 +1598,7 @@ export default function App() {
                         {scoreReport.words.map((w, i) => (
                           <span key={i} className="bg-slate-800 px-2 py-0.5 rounded text-xs text-white font-mono">
                             {w.forwardWord} ({w.score} pts)
-                            {roomData.backwardsAllowed && w.forwardWord !== w.backwardWord && ` / ${w.backwardWord}`}
+                            {(roomData.backwardsAllowed || roomData.diagonalBackwardsAllowed) && w.forwardWord !== w.backwardWord && ` / ${w.backwardWord}`}
                           </span>
                         ))}
                       </span>
@@ -1753,7 +1762,7 @@ export default function App() {
                   </div>
                   <div className="bg-slate-900 p-2 rounded">
                     <span className="text-slate-500 block">Backwards:</span>
-                    <span className="font-extrabold text-amber-200">{roomData.backwardsAllowed ? 'Allowed' : 'Disabled'}</span>
+                    <span className="font-extrabold text-amber-200">{roomData.backwardsAllowed ? 'Allowed' : (roomData.diagonalBackwardsAllowed ? 'Diag Only' : 'Disabled')}</span>
                   </div>
                 </div>
               </div>
