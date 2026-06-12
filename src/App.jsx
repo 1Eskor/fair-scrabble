@@ -300,10 +300,7 @@ export default function App() {
   // Scroll chat to bottom
   useEffect(() => {
     if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTo({
-        top: chatContainerRef.current.scrollHeight,
-        behavior: 'smooth'
-      });
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [roomData?.chat?.length]);
 
@@ -1788,6 +1785,8 @@ export default function App() {
                   {/* Exchange mode trigger */}
                   {!exchangeMode ? (
                     <button
+                      type="button"
+                      onFocus={(e) => e.target.blur()}
                       onClick={() => {
                         setExchangeMode(true);
                         setSelectedExchangeIds([]);
@@ -1804,6 +1803,8 @@ export default function App() {
                   ) : (
                     <div className="col-span-2 md:col-span-1 flex gap-1">
                       <button
+                        type="button"
+                        onFocus={(e) => e.target.blur()}
                         onClick={handleExchangeTiles}
                         className={`flex-1 font-bold py-2.5 px-2 rounded-xl text-xs transition border ${
                           isDark 
@@ -1814,6 +1815,8 @@ export default function App() {
                         Confirm
                       </button>
                       <button
+                        type="button"
+                        onFocus={(e) => e.target.blur()}
                         onClick={() => {
                           setExchangeMode(false);
                           setSelectedExchangeIds([]);
@@ -1830,6 +1833,8 @@ export default function App() {
                   )}
 
                   <button
+                    type="button"
+                    onFocus={(e) => e.target.blur()}
                     onClick={shuffleRack}
                     className={`font-bold py-2.5 px-3 rounded-xl text-xs transition border ${
                       isDark 
@@ -1841,6 +1846,8 @@ export default function App() {
                   </button>
 
                   <button
+                    type="button"
+                    onFocus={(e) => e.target.blur()}
                     onClick={recallAllTentative}
                     disabled={Object.keys(tentativePlaced).length === 0}
                     className={`font-bold py-2.5 px-3 rounded-xl text-xs transition border ${
@@ -1853,6 +1860,8 @@ export default function App() {
                   </button>
 
                   <button
+                    type="button"
+                    onFocus={(e) => e.target.blur()}
                     onClick={handlePassTurn}
                     disabled={!isMyTurn}
                     className={`font-bold py-2.5 px-3 rounded-xl text-xs transition border ${
@@ -1865,12 +1874,14 @@ export default function App() {
                   </button>
 
                   <button
+                    type="button"
+                    onFocus={(e) => e.target.blur()}
                     onClick={handlePlayTurn}
                     disabled={!isMyTurn || Object.keys(tentativePlaced).length === 0}
                     className={`col-span-2 md:col-span-1 font-black py-2.5 px-3 rounded-xl text-xs shadow-lg transition active:scale-95 border ${
                       isDark 
                         ? 'bg-slate-300 hover:bg-slate-200 text-slate-955 border-slate-400 disabled:bg-slate-800 disabled:border-slate-700 disabled:text-slate-550' 
-                        : 'bg-slate-200 hover:bg-slate-300 text-slate-955 border-slate-300 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-450'
+                        : 'bg-slate-200 hover:bg-slate-300 text-slate-955 border-slate-300 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-455'
                     } disabled:shadow-none disabled:opacity-50`}
                   >
                     🚀 Play Word
