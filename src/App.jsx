@@ -89,6 +89,17 @@ const generateEvenDecks = (gridSize, numPlayers = 2) => {
     };
   }
 
+  if (numPlayers === 3) {
+    playerBlanksCount = 3; // 1 blank per player
+    const pool = ['Q', 'Z', 'J', 'X'];
+    // Give exactly 6 random specials total (2 per player)
+    playerSpecials = [
+      ...pool,
+      pool[Math.floor(Math.random() * pool.length)],
+      pool[Math.floor(Math.random() * pool.length)]
+    ];
+  }
+
   let standards = [];
   Object.entries(standardLettersPool).forEach(([letter, qty]) => {
     for (let i = 0; i < qty; i++) {
@@ -106,7 +117,15 @@ const generateEvenDecks = (gridSize, numPlayers = 2) => {
     });
   };
 
-  dealToDecks(shuffledSpecials, letter => ({ id: Math.random().toString(), letter, score: TILE_SCORES[letter] }));
+  const getTileScore = (letter) => {
+    if (numPlayers === 3) {
+      if (letter === 'Q' || letter === 'Z') return 9;
+      if (letter === 'J' || letter === 'X') return 7;
+    }
+    return TILE_SCORES[letter] || 0;
+  };
+
+  dealToDecks(shuffledSpecials, letter => ({ id: Math.random().toString(), letter, score: getTileScore(letter) }));
   
   const blanks = Array.from({ length: playerBlanksCount }, () => '_');
   dealToDecks(blanks, letter => ({ id: Math.random().toString(), letter, score: 0 }));
@@ -114,7 +133,7 @@ const generateEvenDecks = (gridSize, numPlayers = 2) => {
   const esses = Array.from({ length: playerSCount }, () => 'S');
   dealToDecks(esses, letter => ({ id: Math.random().toString(), letter, score: 1 }));
 
-  dealToDecks(standards, letter => ({ id: Math.random().toString(), letter, score: TILE_SCORES[letter] }));
+  dealToDecks(standards, letter => ({ id: Math.random().toString(), letter, score: getTileScore(letter) }));
 
   const resultDecks = {};
   decks.forEach((deck, idx) => {
