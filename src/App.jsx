@@ -51,54 +51,44 @@ const shuffleArray = (array) => {
 };
 
 // --- EVEN TILE DISTRIBUTION ALGORITHM ---
-const generateEvenDecks = (gridSize) => {
-  // Let's create structured lists of tile configurations
-  // We guarantee each player gets identical amounts of high points, blanks, S's, and balanced letters.
-
-  let playerSpecials = []; // Individual high-scoring specials
+const generateEvenDecks = (gridSize, numPlayers = 2) => {
+  let playerSpecials = []; 
   let playerBlanksCount = 0;
   let playerSCount = 0;
   let standardLettersPool = {};
 
   if (gridSize === 15) {
-    // Standard 100 tiles total (50 per player)
-    // High specials: Z (10), Q (10), X (8), J (8) -> 2 each randomly
+    // 100 tiles total
     playerSpecials = ['Z', 'Q', 'X', 'J'];
-    playerBlanksCount = 1; // 1 Blank each
-    playerSCount = 2; // 2 S's each
-    // Remaining balanced distribution of standard letters (90 tiles total -> 45 per player)
+    playerBlanksCount = 2;
+    playerSCount = 4;
     standardLettersPool = {
       A: 9, B: 2, C: 2, D: 4, E: 12, F: 2, G: 3, H: 2, I: 9, K: 1, L: 4, M: 2,
       N: 6, O: 8, P: 2, R: 6, T: 6, U: 4, V: 2, W: 2, Y: 2
     };
   } else if (gridSize === 17) {
-    // Medium-Large 130 tiles total (65 per player)
-    // High specials: Exactly 1 of each (Z, Q, X, J) for each player! Extremely even.
+    // 130 tiles total
     playerSpecials = ['Z', 'Q', 'X', 'J', 'Z', 'Q', 'X', 'J'];
-    playerBlanksCount = 2; // 2 Blanks each
-    playerSCount = 4; // 4 S's each
-    // Remaining balanced distribution (110 tiles total -> 55 per player)
+    playerBlanksCount = 4; 
+    playerSCount = 8; 
     standardLettersPool = {
       A: 12, B: 3, C: 3, D: 5, E: 15, F: 3, G: 4, H: 3, I: 12, K: 2, L: 5, M: 3,
       N: 8, O: 11, P: 3, R: 8, T: 8, U: 6, V: 3, W: 3, Y: 3
     };
   } else {
-    // 19x19 Grid: Large 160 tiles total (80 per player)
-    // High specials: Exactly 2 of each (Z, Q, X, J) for each player!
+    // 19x19 Grid: 160 tiles total
     playerSpecials = [
       'Z', 'Q', 'X', 'J', 'Z', 'Q', 'X', 'J',
       'Z', 'Q', 'X', 'J', 'Z', 'Q', 'X', 'J'
     ];
-    playerBlanksCount = 3; // 3 Blanks each
-    playerSCount = 6; // 6 S's each
-    // Remaining balanced distribution (126 tiles total -> 63 per player)
+    playerBlanksCount = 6; 
+    playerSCount = 12; 
     standardLettersPool = {
       A: 14, B: 4, C: 4, D: 6, E: 17, F: 4, G: 5, H: 4, I: 14, K: 2, L: 6, M: 4,
       N: 9, O: 12, P: 4, R: 9, T: 9, U: 7, V: 4, W: 4, Y: 4
     };
   }
 
-  // Create standard letter deck
   let standards = [];
   Object.entries(standardLettersPool).forEach(([letter, qty]) => {
     for (let i = 0; i < qty; i++) {
@@ -106,42 +96,31 @@ const generateEvenDecks = (gridSize) => {
     }
   });
   standards = shuffleArray(standards);
-
-  // Split standard deck in half perfectly
-  const halfLen = standards.length / 2;
-  const standardsA = standards.slice(0, halfLen);
-  const standardsB = standards.slice(halfLen);
-
-  // Handle Big Specials distribution (Z, Q, X, J)
   const shuffledSpecials = shuffleArray(playerSpecials);
-  const specialsHalf = shuffledSpecials.length / 2;
-  const specialsA = shuffledSpecials.slice(0, specialsHalf);
-  const specialsB = shuffledSpecials.slice(specialsHalf);
 
-  // Construct Final Decks
-  const createDeck = (specials, blanksCount, sCount, standardsList) => {
-    const deck = [];
-    // Add specials
-    specials.forEach(letter => deck.push({ id: Math.random().toString(), letter, score: TILE_SCORES[letter] }));
-    // Add blanks
-    for (let i = 0; i < blanksCount; i++) {
-      deck.push({ id: Math.random().toString(), letter: '_', score: 0 });
-    }
-    // Add S's
-    for (let i = 0; i < sCount; i++) {
-      deck.push({ id: Math.random().toString(), letter: 'S', score: 1 });
-    }
-    // Add Standards
-    standardsList.forEach(letter => {
-      deck.push({ id: Math.random().toString(), letter, score: TILE_SCORES[letter] });
+  const decks = Array.from({ length: numPlayers }, () => []);
+
+  const dealToDecks = (items, makeItem) => {
+    items.forEach((item, index) => {
+      decks[index % numPlayers].push(makeItem(item));
     });
-    return shuffleArray(deck);
   };
 
-  return {
-    deck1: createDeck(specialsA, playerBlanksCount, playerSCount, standardsA),
-    deck2: createDeck(specialsB, playerBlanksCount, playerSCount, standardsB)
-  };
+  dealToDecks(shuffledSpecials, letter => ({ id: Math.random().toString(), letter, score: TILE_SCORES[letter] }));
+  
+  const blanks = Array.from({ length: playerBlanksCount }, () => '_');
+  dealToDecks(blanks, letter => ({ id: Math.random().toString(), letter, score: 0 }));
+
+  const esses = Array.from({ length: playerSCount }, () => 'S');
+  dealToDecks(esses, letter => ({ id: Math.random().toString(), letter, score: 1 }));
+
+  dealToDecks(standards, letter => ({ id: Math.random().toString(), letter, score: TILE_SCORES[letter] }));
+
+  const resultDecks = {};
+  decks.forEach((deck, idx) => {
+    resultDecks[`deck${idx + 1}`] = shuffleArray(deck);
+  });
+  return resultDecks;
 };
 
 // --- SYMMETRICAL BOARD BONUS CONFIGURATION ---
@@ -229,6 +208,7 @@ export default function App() {
   const [validationMode, setValidationMode] = useState('manual');
   const [timerEnabled, setTimerEnabled] = useState(false);
   const [timerDuration, setTimerDuration] = useState(90);
+  const [threePlayerMode, setThreePlayerMode] = useState(false);
   const [joinInput, setJoinInput] = useState('');
 
   // Local Game State
@@ -353,7 +333,9 @@ export default function App() {
     if (!user) return;
     setError('');
     const newRoomId = Math.random().toString(36).substring(2, 7).toUpperCase();
-    const { deck1, deck2 } = generateEvenDecks(gridSize);
+    
+    const maxPlayers = config.threePlayerMode ? 3 : 2;
+    const decks = generateEvenDecks(gridSize, maxPlayers);
 
     const rackSize = gridSize === 15 ? 7 : (gridSize === 17 ? 8 : 9);
 
@@ -361,6 +343,7 @@ export default function App() {
       roomId: newRoomId,
       gridSize,
       rackSize,
+      maxPlayers,
       diagonalAllowed: config.diagonalAllowed,
       backwardsAllowed: config.backwardsAllowed,
       diagonalBackwardsAllowed: config.diagonalBackwardsAllowed,
@@ -374,7 +357,7 @@ export default function App() {
           uid: user.uid,
           name: username,
           score: 0,
-          deck: deck1,
+          deck: decks.deck1,
           rack: [],
           isReady: false
         }
@@ -426,32 +409,58 @@ export default function App() {
 
       const updatedPlayers = { ...data.players };
       const updatedOrder = [...data.playerOrder];
+      const maxPlayers = data.maxPlayers || 2;
 
       if (!updatedPlayers[user.uid]) {
-        if (Object.keys(updatedPlayers).length >= 2) {
+        const currentCount = Object.keys(updatedPlayers).length;
+        if (currentCount >= maxPlayers) {
           setError("Room is full.");
           return;
         }
 
-        // Get the secondary deck for Player 2
-        const { deck2 } = generateEvenDecks(data.gridSize);
+        // Get the appropriate deck
+        const decks = generateEvenDecks(data.gridSize, maxPlayers);
+        const myDeckKey = `deck${currentCount + 1}`;
+        const myDeck = decks[myDeckKey];
 
         updatedPlayers[user.uid] = {
           uid: user.uid,
           name: username,
           score: 0,
-          deck: deck2, // Assign Player 2 Even Deck
+          deck: myDeck,
           rack: [],
           isReady: true
         };
         updatedOrder.push(user.uid);
       }
 
-      // Automatically start the game since we have 2 players connected now
       const finalPlayers = { ...updatedPlayers };
+      const currentCount = Object.keys(finalPlayers).length;
+
+      // If room is not full yet, just join and wait
+      if (currentCount < maxPlayers) {
+        await updateDoc(roomRef, {
+          players: finalPlayers,
+          playerOrder: updatedOrder,
+          history: [
+            ...data.history,
+            {
+              id: Math.random().toString(),
+              timestamp: Date.now(),
+              type: 'system',
+              message: `${username} joined the room.`
+            }
+          ]
+        });
+        setRoomId(cleanId);
+        showTemporarySuccess("Joined room. Waiting for players...");
+        return;
+      }
+
+      // Automatically start the game since we have all players connected now
       const rackSize = data.rackSize;
 
-      // Draw initial racks for both players
+      // Draw initial racks for all players
       updatedOrder.forEach(uid => {
         const p = finalPlayers[uid];
         if (p.rack.length === 0) {
@@ -1113,8 +1122,9 @@ export default function App() {
     const playerList = Object.values(updated).sort((a, b) => b.score - a.score);
     if (playerList.length >= 2) {
       const winner = playerList[0];
-      const loser = playerList[1];
-      details.push(`\n\nTHE CHAMP IS HERE. THE CHAMP IS HERE. ${winner.name} is the winner.\n${loser.name} is garbage.`);
+      const losers = playerList.slice(1);
+      const losersStr = losers.map(l => `${l.name} is garbage.`).join(' ');
+      details.push(`\n\nTHE CHAMP IS HERE. THE CHAMP IS HERE. ${winner.name} is the winner.\n${losersStr}`);
     }
 
     return { 
@@ -1208,8 +1218,9 @@ export default function App() {
       }
     }
 
-    // Toggle turn
-    const otherPlayerId = roomData.playerOrder.find(id => id !== user.uid) || user.uid;
+    // Toggle turn cyclically
+    const currentIndex = roomData.playerOrder.indexOf(user.uid);
+    const nextPlayerId = roomData.playerOrder[(currentIndex + 1) % roomData.playerOrder.length] || user.uid;
     const turnPoints = scoreData.totalScore;
     const finalScore = myPlayer.score + turnPoints;
 
@@ -1253,7 +1264,7 @@ export default function App() {
     let finalUpdateObj = {
       board: updatedBoard,
       players: updatedPlayers,
-      activePlayerId: otherPlayerId,
+      activePlayerId: nextPlayerId,
       turnStartTime: Date.now(),
       history: [...roomData.history, historyItem],
       turnIndex: roomData.turnIndex + 1,
@@ -1290,7 +1301,8 @@ export default function App() {
     setError('');
 
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
-    const otherPlayerId = roomData.playerOrder.find(id => id !== user.uid) || user.uid;
+    const currentIndex = roomData.playerOrder.indexOf(user.uid);
+    const nextPlayerId = roomData.playerOrder[(currentIndex + 1) % roomData.playerOrder.length] || user.uid;
     const myPlayer = roomData.players[user.uid];
 
     const historyItem = {
@@ -1301,10 +1313,11 @@ export default function App() {
     };
 
     const newConsecutiveZero = (roomData.consecutiveZeroTurns || 0) + 1;
-    const isGameOver = newConsecutiveZero >= 6;
+    const maxPasses = (roomData.maxPlayers || 2) * 3;
+    const isGameOver = newConsecutiveZero >= maxPasses;
 
     let finalUpdateObj = {
-      activePlayerId: otherPlayerId,
+      activePlayerId: nextPlayerId,
       turnStartTime: Date.now(),
       history: [...roomData.history, historyItem],
       turnIndex: roomData.turnIndex + 1,
@@ -1319,7 +1332,7 @@ export default function App() {
         id: Math.random().toString(),
         timestamp: Date.now() + 1,
         type: 'system',
-        message: `GAME OVER! 6 consecutive zero-score turns passed. ${detailsStr}`
+        message: `GAME OVER! ${maxPasses} consecutive zero-score turns passed. ${detailsStr}`
       });
     }
 
@@ -1361,7 +1374,8 @@ export default function App() {
     // Now return old tiles to the private deck and shuffle
     const updatedDeck = shuffleArray([...myDeck, ...tilesToReturn]);
 
-    const otherPlayerId = roomData.playerOrder.find(id => id !== user.uid) || user.uid;
+    const currentIndex = roomData.playerOrder.indexOf(user.uid);
+    const nextPlayerId = roomData.playerOrder[(currentIndex + 1) % roomData.playerOrder.length] || user.uid;
     const historyItem = {
       id: Math.random().toString(),
       timestamp: Date.now(),
@@ -1377,11 +1391,12 @@ export default function App() {
     };
 
     const newConsecutiveZero = (roomData.consecutiveZeroTurns || 0) + 1;
-    const isGameOver = newConsecutiveZero >= 6;
+    const maxPasses = (roomData.maxPlayers || 2) * 3;
+    const isGameOver = newConsecutiveZero >= maxPasses;
 
     let finalUpdateObj = {
       players: updatedPlayers,
-      activePlayerId: otherPlayerId,
+      activePlayerId: nextPlayerId,
       turnStartTime: Date.now(),
       history: [...roomData.history, historyItem],
       turnIndex: roomData.turnIndex + 1,
@@ -1396,7 +1411,7 @@ export default function App() {
         id: Math.random().toString(),
         timestamp: Date.now() + 1,
         type: 'system',
-        message: `GAME OVER! 6 consecutive zero-score turns passed. ${detailsStr}`
+        message: `GAME OVER! ${maxPasses} consecutive zero-score turns passed. ${detailsStr}`
       });
     }
 
@@ -1801,6 +1816,26 @@ export default function App() {
                 <div className="space-y-2">
                   <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${
                     isDark ? 'text-slate-400' : 'text-slate-500'
+                  }`}>Player Count</label>
+                  <div className={`flex items-center justify-between p-3 rounded-xl border transition-colors cursor-pointer ${
+                    isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-50 border-slate-200'
+                  }`} onClick={() => setThreePlayerMode(!threePlayerMode)}>
+                    <span className={`text-sm font-bold flex items-center gap-2 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                      👥 3-Player Mode
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={threePlayerMode}
+                      onChange={(e) => setThreePlayerMode(e.target.checked)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="accent-slate-500 h-4 w-4"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${
+                    isDark ? 'text-slate-400' : 'text-slate-500'
                   }`}>Spell Check Mode</label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -1837,7 +1872,8 @@ export default function App() {
                     diagonalBackwardsAllowed,
                     validationMode,
                     timerEnabled,
-                    timerDuration
+                    timerDuration,
+                    threePlayerMode
                   })}
                   className={`w-full font-black text-sm py-3 px-4 rounded-xl shadow-lg transition active:scale-[0.98] border ${
                     isDark 
@@ -2338,30 +2374,38 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Opponent Player */}
-                  {opponent ? (
-                    <div className={`p-4 rounded-xl border flex items-center justify-between transition ${
-                      roomData.activePlayerId === opponent.uid
-                        ? isDark
-                          ? 'bg-slate-850 border-slate-700 ring-1 ring-slate-550/20'
-                          : 'bg-amber-50 border-amber-300 ring-1 ring-amber-400/20'
-                        : isDark
-                          ? 'bg-[#111317] border-[#21252d]'
-                          : 'bg-slate-50 border-slate-200'
-                    }`}>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{opponent.name}</span>
-                          <span className="text-[10px] bg-[#571c1c]/50 px-1.5 py-0.5 rounded text-[#fca5a5]">B</span>
+                  {/* Opponent Players */}
+                  {roomData.playerOrder.filter(id => id !== user.uid).map((oppId, idx) => {
+                    const opp = roomData.players[oppId];
+                    if (!opp) return null;
+                    const letterBadge = idx === 0 ? 'B' : 'C';
+                    const badgeBg = idx === 0 ? 'bg-[#571c1c]/50 text-[#fca5a5]' : 'bg-[#1c5741]/50 text-[#a5fcd2]';
+                    return (
+                      <div key={oppId} className={`p-4 rounded-xl border flex items-center justify-between transition ${
+                        roomData.activePlayerId === oppId
+                          ? isDark
+                            ? 'bg-slate-850 border-slate-700 ring-1 ring-slate-550/20'
+                            : 'bg-amber-50 border-amber-300 ring-1 ring-amber-400/20'
+                          : isDark
+                            ? 'bg-[#111317] border-[#21252d]'
+                            : 'bg-slate-50 border-slate-200'
+                      }`}>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{opp.name}</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${badgeBg}`}>{letterBadge}</span>
+                          </div>
+                          <p className={`text-xs mt-1 transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Remaining Tiles: {opp.deck.length}</p>
                         </div>
-                        <p className={`text-xs mt-1 transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Remaining Tiles: {opponent.deck.length}</p>
+                        <div className="text-right">
+                          <span className={`text-2xl font-black transition-colors ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{opp.score}</span>
+                          <span className={`text-xs block transition-colors ${isDark ? 'text-slate-550' : 'text-slate-400'}`}>pts</span>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <span className={`text-2xl font-black transition-colors ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{opponent.score}</span>
-                        <span className={`text-xs block transition-colors ${isDark ? 'text-slate-550' : 'text-slate-400'}`}>pts</span>
-                      </div>
-                    </div>
-                  ) : (
+                    );
+                  })}
+                  
+                  {roomData.playerOrder.length < (roomData.maxPlayers || 2) && (
                     <div className={`border p-4 rounded-xl text-center text-xs transition-colors ${
                       isDark ? 'bg-[#111317]/50 border-dashed border-[#21252d] text-slate-500' : 'bg-slate-50 border-dashed border-slate-250 text-slate-400'
                     }`}>
