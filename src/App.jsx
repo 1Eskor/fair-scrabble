@@ -1815,6 +1815,39 @@ export default function App() {
   // Real-time placement scoring evaluation
   const scoreReport = roomData ? getFormedWordsAndScores() : null;
 
+  // Track remaining tiles (unplayed tiles in decks and racks)
+  const remainingCounts = (() => {
+    if (!roomData || !roomData.players) return {};
+    const counts = {};
+    Object.values(roomData.players).forEach(p => {
+      if (p.deck) {
+        p.deck.forEach(t => {
+          let char = (t.letter || '').toUpperCase();
+          if (char === '_') char = '?';
+          if (char) {
+            counts[char] = (counts[char] || 0) + 1;
+          }
+        });
+      }
+      if (p.rack) {
+        p.rack.forEach(t => {
+          let char = (t.letter || '').toUpperCase();
+          if (char === '_') char = '?';
+          if (char) {
+            counts[char] = (counts[char] || 0) + 1;
+          }
+        });
+      }
+    });
+    return counts;
+  })();
+
+  const sortedLetters = Object.keys(remainingCounts).sort((a, b) => {
+    if (a === '?') return 1;
+    if (b === '?') return -1;
+    return a.localeCompare(b);
+  });
+
   // Turn Timer & Auto-Pass Logic
   const [remainingTime, setRemainingTime] = useState(0);
   const lastPassedTurnIndexRef = useRef(-1);
@@ -2916,6 +2949,35 @@ export default function App() {
                       Waiting for opponents...
                     </div>
                   )}
+
+                  {/* Remaining Tiles Section */}
+                  <div className={`p-4 rounded-xl border transition ${
+                    isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${isDark ? 'text-slate-400' : 'text-slate-550'}`}>
+                        Remaining Tiles ({Object.values(remainingCounts).reduce((a, b) => a + b, 0)})
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+                      {sortedLetters.map(letter => (
+                        <div 
+                          key={letter}
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold flex items-center gap-1 border ${
+                            isDark 
+                              ? 'bg-[#15181d] border-[#21252d] text-slate-300' 
+                              : 'bg-white border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          <span className={letter === '?' ? 'text-amber-500 font-extrabold' : (isDark ? 'text-slate-400' : 'text-slate-500')}>{letter}</span>
+                          <span className={isDark ? 'text-slate-200' : 'text-slate-900'}>{remainingCounts[letter]}</span>
+                        </div>
+                      ))}
+                      {sortedLetters.length === 0 && (
+                        <span className="text-xs text-slate-500 italic">No remaining tiles</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
