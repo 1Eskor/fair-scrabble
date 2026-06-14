@@ -2000,7 +2000,25 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   const isMobile = windowWidth < 768;
-  const baseCellSize = isMobile ? 24 : 38;
+  const baseCellSize = (() => {
+    const gridSize = roomData?.gridSize || 15;
+    if (isMobile) {
+      // Calculate mobile cell size dynamically so the board fits perfectly on the screen
+      const totalPaddingAndBorders = 60; // 32px (main layout) + 12px (card padding) + 12px (inner board padding) + 4px (borders)
+      const gapSize = 2;
+      const availableSpaceForCells = windowWidth - totalPaddingAndBorders - (gridSize - 1) * gapSize;
+      const calculatedBase = Math.floor(availableSpaceForCells / gridSize);
+      return Math.max(14, Math.min(28, calculatedBase));
+    } else {
+      // On desktop/tablet, check estimated space (column width is roughly 62% of windowWidth)
+      const estimatedColWidth = Math.floor(windowWidth * 0.62);
+      const totalPaddingAndBorders = 120; // larger paddings on desktop
+      const gapSize = 4;
+      const availableSpaceForCells = estimatedColWidth - totalPaddingAndBorders - (gridSize - 1) * gapSize;
+      const calculatedBase = Math.floor(availableSpaceForCells / gridSize);
+      return Math.max(24, Math.min(38, calculatedBase));
+    }
+  })();
   const cellSize = Math.round(baseCellSize * boardZoom);
 
   const isDark = theme === 'dark';
@@ -2616,10 +2634,10 @@ export default function App() {
               </div>
 
               {/* Interactive Scrabble Board Display */}
-              <div className={`w-full p-1.5 md:p-6 rounded-2xl shadow-2xl overflow-auto flex justify-start md:justify-center border transition-colors ${
+              <div className={`w-full p-1.5 md:p-6 rounded-2xl shadow-2xl overflow-auto flex border transition-colors ${
                 isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
               }`}>
-                <div className={`select-none p-1.5 md:p-2 rounded-xl border transition-colors ${
+                <div className={`select-none p-1.5 md:p-2 rounded-xl border transition-colors mx-auto ${
                   isDark ? 'bg-[#111317] border-slate-900' : 'bg-slate-200 border-slate-300'
                 }`}>
                   <div
