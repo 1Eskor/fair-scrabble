@@ -1902,6 +1902,11 @@ export default function App() {
   const [remainingTime, setRemainingTime] = useState(0);
   const lastPassedTurnIndexRef = useRef(-1);
 
+  const handleAutoPlayOrPassRef = useRef(handleAutoPlayOrPass);
+  useEffect(() => {
+    handleAutoPlayOrPassRef.current = handleAutoPlayOrPass;
+  });
+
   // Flash red warning when timer hits 10 seconds
   const [shouldFlashRed, setShouldFlashRed] = useState(false);
   useEffect(() => {
@@ -1928,7 +1933,7 @@ export default function App() {
         if (roomData.activePlayerId === user?.uid) {
           if (lastPassedTurnIndexRef.current !== roomData.turnIndex) {
             lastPassedTurnIndexRef.current = roomData.turnIndex;
-            handleAutoPlayOrPass();
+            handleAutoPlayOrPassRef.current();
           }
         } else {
           // If it is NOT my turn, wait for a 1.5-second grace period
@@ -2725,8 +2730,10 @@ export default function App() {
               </div>
 
               {/* Rack Controls Section */}
-              <div className={`w-full border p-4 md:p-6 rounded-2xl shadow-xl space-y-4 transition-colors ${
-                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+              <div className={`w-full border p-4 md:p-6 rounded-2xl shadow-xl space-y-4 transition-all duration-300 ${
+                shouldFlashRed
+                  ? isDark ? 'bg-[#7f1d1d] border-[#991b1b]' : 'bg-[#fee2e2] border-[#fca5a5]'
+                  : isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
               }`}>
 
                 {/* Rack Tiles */}
@@ -2735,10 +2742,8 @@ export default function App() {
                     {exchangeMode ? "Select Tiles to Exchange" : "Your Tile Rack"}
                   </span>
 
-                  <div className={`flex items-center gap-2 md:gap-3 p-3 rounded-2xl border shadow-inner max-w-full overflow-x-auto transition-all duration-300 ${
-                    shouldFlashRed
-                      ? isDark ? 'bg-[#7f1d1d] border-[#991b1b]' : 'bg-[#fee2e2] border-[#fca5a5]'
-                      : isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-100 border-slate-200'
+                  <div className={`flex items-center gap-2 md:gap-3 p-3 rounded-2xl border shadow-inner max-w-full overflow-x-auto transition-colors ${
+                    isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-100 border-slate-200'
                   }`}>
                     {me?.rack.map((tile, idx) => {
                       // Check if tile is tentatively placed on the board right now
@@ -2932,43 +2937,55 @@ export default function App() {
 
               {/* Interactive endgame visual scorecard */}
               {roomData.status === 'finished' && (
-                <div className={`border p-5 rounded-2xl shadow-xl space-y-4 border-indigo-500/40 bg-indigo-950/20 backdrop-blur transition-all duration-300`}>
-                  <h3 className="text-base font-extrabold text-indigo-400 flex items-center gap-2">
+                <div className={`border p-5 rounded-2xl shadow-xl space-y-4 transition-all duration-300 ${
+                  isDark 
+                    ? 'border-[#21252d] bg-[#15181d] text-slate-350 shadow-xl' 
+                    : 'border-slate-200 bg-white text-slate-700 shadow-xl'
+                }`}>
+                  <h3 className={`text-base font-extrabold flex items-center gap-2 ${
+                    isDark ? 'text-indigo-400' : 'text-indigo-600'
+                  }`}>
                     🏆 Final Game Scorecard
                   </h3>
                   <div className="space-y-2">
                     {Object.values(roomData.players).sort((a, b) => b.score - a.score).map((p, idx) => (
-                      <div key={p.uid} className="flex justify-between items-center bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                      <div key={p.uid} className={`flex justify-between items-center p-2.5 rounded-xl border ${
+                        isDark 
+                          ? 'bg-[#111317] border-slate-800' 
+                          : 'bg-slate-50 border-slate-200'
+                      }`}>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-slate-300">{idx + 1}. {p.name}</span>
+                          <span className={`text-sm font-bold ${isDark ? 'text-slate-300' : 'text-slate-750'}`}>{idx + 1}. {p.name}</span>
                           {idx === 0 && <span className="text-xs">👑</span>}
                         </div>
-                        <span className="text-sm font-black text-indigo-300">{p.score} pts</span>
+                        <span className={`text-sm font-black ${isDark ? 'text-indigo-350' : 'text-indigo-650'}`}>{p.score} pts</span>
                       </div>
                     ))}
                   </div>
 
-                  <div className="space-y-2 pt-2 border-t border-slate-800">
-                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Turn-by-Turn Recap</h4>
-                    <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1 text-[11px] font-mono leading-relaxed text-slate-300">
+                  <div className={`space-y-2 pt-2 border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                    <h4 className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Turn-by-Turn Recap</h4>
+                    <div className={`max-h-60 overflow-y-auto overflow-x-hidden break-words space-y-1.5 pr-1 text-[11px] font-mono leading-relaxed ${
+                      isDark ? 'text-slate-300' : 'text-slate-600'
+                    }`}>
                       {roomData.history.filter(h => ['turn', 'pass', 'exchange'].includes(h.type)).map((item, idx) => {
                         if (item.type === 'turn') {
                           const wordsStr = (item.words || []).map(w => `"${w.word}"`).join(', ');
                           return (
                             <div key={item.id || idx}>
-                              <span className="text-indigo-400 font-bold">{item.playerName}</span>: played {wordsStr || 'word'} for <span className="text-emerald-400 font-bold">{item.points} pts</span>
+                              <span className={`${isDark ? 'text-indigo-400' : 'text-indigo-650'} font-bold`}>{item.playerName}</span>: played {wordsStr || 'word'} for <span className={`${isDark ? 'text-emerald-400' : 'text-emerald-650'} font-bold`}>{item.points} pts</span>
                             </div>
                           );
                         } else if (item.type === 'pass') {
                           return (
-                            <div key={item.id || idx} className="text-slate-500">
-                              <span className="text-indigo-400 font-bold">{item.playerName}</span>: skipped
+                            <div key={item.id || idx} className={isDark ? 'text-slate-500' : 'text-slate-400'}>
+                              <span className={`${isDark ? 'text-indigo-400' : 'text-indigo-650'} font-bold`}>{item.playerName}</span>: skipped
                             </div>
                           );
                         } else if (item.type === 'exchange') {
                           return (
-                            <div key={item.id || idx} className="text-slate-500">
-                              <span className="text-indigo-400 font-bold">{item.playerName}</span>: exchanged tiles
+                            <div key={item.id || idx} className={isDark ? 'text-slate-500' : 'text-slate-400'}>
+                              <span className={`${isDark ? 'text-indigo-400' : 'text-indigo-650'} font-bold`}>{item.playerName}</span>: exchanged tiles
                             </div>
                           );
                         }
@@ -3139,7 +3156,7 @@ export default function App() {
                 isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
               }`}>
                 <h3 className={`text-sm font-bold uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>📜 Game Play Log</h3>
-                <div className={`h-32 overflow-y-auto space-y-1.5 pr-1 text-[11px] font-mono border-t pt-2 transition-colors ${
+                <div className={`h-32 overflow-y-auto overflow-x-hidden break-words space-y-1.5 pr-1 text-[11px] font-mono border-t pt-2 transition-colors ${
                   isDark ? 'border-slate-900' : 'border-slate-200'
                 }`}>
                   {roomData.history?.slice().reverse().map((item, idx) => {
@@ -3147,7 +3164,7 @@ export default function App() {
                     if (item.type === 'turn') color = isDark ? 'text-[#4ade80] font-semibold' : 'text-emerald-700 font-semibold';
                     if (item.type === 'pass') color = isDark ? 'text-slate-500' : 'text-slate-400';
                     if (item.type === 'exchange') color = isDark ? 'text-sky-400' : 'text-sky-700';
-                    if (item.type === 'scorecard') color = isDark ? 'text-indigo-300 whitespace-pre border-t border-b border-indigo-900/50 py-2' : 'text-indigo-800 whitespace-pre border-t border-b border-indigo-100 py-2';
+                    if (item.type === 'scorecard') color = isDark ? 'text-indigo-300 whitespace-pre-wrap border-t border-b border-indigo-900/50 py-2' : 'text-indigo-800 whitespace-pre-wrap border-t border-b border-indigo-100 py-2';
 
                     return (
                       <div key={item.id || idx} className={`${color} leading-tight`}>
