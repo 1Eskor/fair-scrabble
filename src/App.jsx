@@ -273,11 +273,14 @@ export default function App() {
   // Customization State
   const [showCustomizationPage, setShowCustomizationPage] = useState(false);
   const DEFAULT_COLORS = {
-    boardBg: '#1a1d23',
+    boardBg: '#f2f2f2',
     blankTile: '#f8fafc',
     dlTile: '#7dd3fc',
+    dlText: '#0c4a6e',
     dwTile: '#fda4af',
+    dwText: '#881337',
     twTile: '#f43f5e',
+    twText: '#ffffff',
     scrTileBg: '#d7be8a',
     scrTileText: '#2d2008',
   };
@@ -2667,9 +2670,7 @@ export default function App() {
 
               {/* Interactive Scrabble Board Display */}
               <div className="w-full p-0 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-2xl overflow-auto flex border-0 md:border" style={{ backgroundColor: customColors.boardBg }}>
-                <div className={`select-none p-0.5 md:p-2 rounded-lg md:rounded-xl border transition-colors mx-auto ${
-                  isDark ? 'bg-[#111317] border-slate-900' : 'bg-slate-200 border-slate-300'
-                }`}>
+                <div className="select-none p-0.5 md:p-2 rounded-lg md:rounded-xl border mx-auto" style={{ backgroundColor: customColors.boardBg, borderColor: isDark ? '#0f1114' : '#d1d5db' }}>
                   <div
                     className="grid"
                     style={{
@@ -2693,19 +2694,19 @@ export default function App() {
                         if (!bonus) {
                           cellStyle = { backgroundColor: isDark ? '#262a33' : '#f8fafc', borderColor: isDark ? '#323743' : '#cbd5e1', color: isDark ? '#94a3b8' : '#94a3b8' };
                         } else if (bonus === 'TW') {
-                          cellStyle = { backgroundColor: customColors.twTile, borderColor: isDark ? '#8f3636' : '#fda4af', color: isDark ? '#e2b4b4' : '#fff' };
+                          cellStyle = { backgroundColor: customColors.twTile, borderColor: isDark ? '#8f3636' : '#fda4af', color: customColors.twText || '#ffffff' };
                           cellLabel = 'TW';
                         } else if (bonus === 'DW') {
-                          cellStyle = { backgroundColor: customColors.dwTile, borderColor: isDark ? '#a85b5b' : '#fecdd3', color: isDark ? '#eed3d3' : '#881337' };
+                          cellStyle = { backgroundColor: customColors.dwTile, borderColor: isDark ? '#a85b5b' : '#fecdd3', color: customColors.dwText || '#881337' };
                           cellLabel = 'DW';
                         } else if (bonus === 'TL') {
                           cellStyle = { backgroundColor: isDark ? '#162d4c' : '#2563eb', borderColor: isDark ? '#203c62' : '#93c5fd', color: isDark ? '#a8c0e0' : '#fff' };
                           cellLabel = 'TL';
                         } else if (bonus === 'DL') {
-                          cellStyle = { backgroundColor: customColors.dlTile, borderColor: isDark ? '#335372' : '#bae6fd', color: isDark ? '#bcd5eb' : '#0c4a6e' };
+                          cellStyle = { backgroundColor: customColors.dlTile, borderColor: isDark ? '#335372' : '#bae6fd', color: customColors.dlText || '#0c4a6e' };
                           cellLabel = 'DL';
                         } else if (bonus === 'star') {
-                          cellStyle = { backgroundColor: customColors.dwTile, borderColor: isDark ? '#a85b5b' : '#fecdd3', color: isDark ? '#eed3d3' : '#881337' };
+                          cellStyle = { backgroundColor: customColors.dwTile, borderColor: isDark ? '#a85b5b' : '#fecdd3', color: customColors.dwText || '#881337' };
                           cellLabel = '★';
                         }
 
@@ -2818,17 +2819,17 @@ export default function App() {
                               fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
                               willChange: 'transform',
                               transform: isSelected ? 'translateY(-8px)' : 'translateY(0)',
-                              transition: 'transform 80ms ease-out, box-shadow 80ms ease-out',
+                              transition: 'none',
                               backgroundColor: isPlaced
                                 ? isDark ? '#1f232b' : '#e2e8f0'
                                 : isSelectedExchange
                                   ? '#782b2b'
-                                  : customColors.scrTileBg,
+                                  : tile.letter === '_' ? customColors.blankTile : customColors.scrTileBg,
                               color: isPlaced
                                 ? 'transparent'
                                 : isSelectedExchange
                                   ? '#fff'
-                                  : customColors.scrTileText,
+                                  : tile.letter === '_' ? customColors.scrTileText : customColors.scrTileText,
                               boxShadow: isSelected ? '0 6px 16px rgba(0,0,0,0.35), 0 0 0 3px rgba(245,158,11,0.4)' : undefined,
                               borderWidth: '2px',
                               borderStyle: isPlaced ? 'dashed' : 'solid',
@@ -3405,10 +3406,13 @@ export default function App() {
                 isDark ? 'text-slate-400' : 'text-slate-500'
               }`}>Board</h3>
               {[
-                { label: 'Background', key: 'boardBg' },
-                { label: 'Double Letter (DL)', key: 'dlTile' },
-                { label: 'Double Word / Center (DW ★)', key: 'dwTile' },
-                { label: 'Triple Word (TW)', key: 'twTile' },
+                { label: 'Grid Gap / Background', key: 'boardBg' },
+                { label: 'DL — Fill', key: 'dlTile' },
+                { label: 'DL — Text', key: 'dlText' },
+                { label: 'DW / Center — Fill', key: 'dwTile' },
+                { label: 'DW / Center — Text', key: 'dwText' },
+                { label: 'TW — Fill', key: 'twTile' },
+                { label: 'TW — Text', key: 'twText' },
               ].map(({ label, key }) => (
                 <div key={key} className="flex items-center justify-between gap-3">
                   <label className={`text-sm flex-1 ${
@@ -3473,16 +3477,10 @@ export default function App() {
               }`}>Preview</h3>
               <div className="flex gap-2 flex-wrap">
                 {/* Board squares */}
-                {[
-                  { bg: customColors.boardBg, label: 'BG' },
-                  { bg: customColors.dlTile, label: 'DL' },
-                  { bg: customColors.dwTile, label: 'DW' },
-                  { bg: customColors.twTile, label: 'TW' },
-                ].map(({ bg, label }) => (
-                  <div key={label} className="w-10 h-10 rounded-md flex items-center justify-center text-[10px] font-black border border-black/10 shadow-sm" style={{ backgroundColor: bg, color: bg }}>
-                    <span style={{ color: isDark ? '#fff' : '#000', mixBlendMode: 'difference' }}>{label}</span>
-                  </div>
-                ))}
+                <div className="w-10 h-10 rounded-md border border-black/10 shadow-sm" style={{ backgroundColor: customColors.boardBg }} title="Grid Gap" />
+                <div className="w-10 h-10 rounded-md flex items-center justify-center text-[10px] font-black border border-black/10 shadow-sm" style={{ backgroundColor: customColors.dlTile, color: customColors.dlText || '#0c4a6e' }}>DL</div>
+                <div className="w-10 h-10 rounded-md flex items-center justify-center text-[10px] font-black border border-black/10 shadow-sm" style={{ backgroundColor: customColors.dwTile, color: customColors.dwText || '#881337' }}>DW</div>
+                <div className="w-10 h-10 rounded-md flex items-center justify-center text-[10px] font-black border border-black/10 shadow-sm" style={{ backgroundColor: customColors.twTile, color: customColors.twText || '#ffffff' }}>TW</div>
                 {/* Scrabble tile */}
                 <div className="w-10 h-10 rounded-md flex flex-col items-center justify-center text-[16px] font-extrabold border border-black/20 shadow relative" style={{ backgroundColor: customColors.scrTileBg, color: customColors.scrTileText }}>
                   A
