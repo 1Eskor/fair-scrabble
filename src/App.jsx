@@ -52,12 +52,13 @@ const shuffleArray = (array) => {
 
 // --- EVEN TILE DISTRIBUTION ALGORITHM ---
 const generateEvenDecks = (gridSize, numPlayers = 2, evenDistributionMode = false) => {
+  const size = Number(gridSize);
   let playerSpecials = []; 
   let playerBlanksCount = 0;
   let playerSCount = 0;
   let standardLettersPool = {};
 
-  if (gridSize === 15) {
+  if (size === 15) {
     // 100 tiles total
     playerSpecials = ['Z', 'Q', 'X', 'J'];
     playerBlanksCount = 2;
@@ -66,17 +67,17 @@ const generateEvenDecks = (gridSize, numPlayers = 2, evenDistributionMode = fals
       A: 9, B: 2, C: 2, D: 4, E: 12, F: 2, G: 3, H: 2, I: 9, K: 1, L: 4, M: 2,
       N: 6, O: 8, P: 2, R: 6, T: 6, U: 4, V: 2, W: 2, Y: 2
     };
-  } else if (gridSize === 17) {
-    // 130 tiles total
+  } else if (size === 17) {
+    // 130 tiles total (20 specials/blanks/S + 110 standards)
     playerSpecials = ['Z', 'Q', 'X', 'J', 'Z', 'Q', 'X', 'J'];
     playerBlanksCount = 4; 
     playerSCount = 8; 
     standardLettersPool = {
-      A: 12, B: 3, C: 3, D: 5, E: 15, F: 3, G: 4, H: 3, I: 12, K: 2, L: 5, M: 3,
-      N: 8, O: 11, P: 3, R: 8, T: 8, U: 6, V: 3, W: 3, Y: 3
+      A: 10, B: 3, C: 3, D: 4, E: 13, F: 3, G: 3, H: 3, I: 10, K: 2, L: 4, M: 3,
+      N: 7, O: 9, P: 2, R: 7, T: 7, U: 5, V: 3, W: 3, Y: 3
     };
   } else {
-    // 19x19 Grid: 160 tiles total
+    // 19x19 Grid: 160 tiles total (34 specials/blanks/S + 126 standards)
     playerSpecials = [
       'Z', 'Q', 'X', 'J', 'Z', 'Q', 'X', 'J',
       'Z', 'Q', 'X', 'J', 'Z', 'Q', 'X', 'J'
@@ -84,8 +85,8 @@ const generateEvenDecks = (gridSize, numPlayers = 2, evenDistributionMode = fals
     playerBlanksCount = 6; 
     playerSCount = 12; 
     standardLettersPool = {
-      A: 14, B: 4, C: 4, D: 6, E: 17, F: 4, G: 5, H: 4, I: 14, K: 2, L: 6, M: 4,
-      N: 9, O: 12, P: 4, R: 9, T: 9, U: 7, V: 4, W: 4, Y: 4
+      A: 12, B: 3, C: 3, D: 5, E: 14, F: 3, G: 4, H: 4, I: 12, K: 2, L: 5, M: 4,
+      N: 8, O: 10, P: 3, R: 8, T: 8, U: 6, V: 4, W: 4, Y: 4
     };
   }
 
@@ -474,7 +475,7 @@ export default function App() {
         }
 
         // Get the appropriate deck
-        const decks = generateEvenDecks(data.gridSize, maxPlayers);
+        const decks = generateEvenDecks(data.gridSize, maxPlayers, data.evenDistributionMode);
         const myDeckKey = `deck${currentCount + 1}`;
         const myDeck = decks[myDeckKey];
 
