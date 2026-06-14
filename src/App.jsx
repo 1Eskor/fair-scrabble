@@ -398,7 +398,8 @@ export default function App() {
           score: 0,
           deck: decks.deck1,
           rack: [],
-          isReady: false
+          isReady: false,
+          lastActive: Date.now()
         }
       },
       playerOrder: [user.uid],
@@ -468,7 +469,8 @@ export default function App() {
           score: 0,
           deck: myDeck,
           rack: [],
-          isReady: true
+          isReady: true,
+          lastActive: Date.now()
         };
         updatedOrder.push(user.uid);
       }
@@ -939,7 +941,7 @@ export default function App() {
           let wordMultiplier = 1;
 
           wordCells.forEach(wc => {
-            const val = wc.tile.isBlank ? 0 : TILE_SCORES[wc.tile.letter] || 0;
+            const val = wc.tile.isBlank ? 0 : (wc.tile.score !== undefined ? wc.tile.score : (TILE_SCORES[wc.tile.letter] || 0));
             if (wc.isNew) {
               const bonus = getBonus(wc.r, wc.c, roomData.gridSize);
               if (bonus === 'DL') score += val * 2;
@@ -1150,7 +1152,7 @@ export default function App() {
     };
   };
 
-  const calculateEndgame = (currentPlayers, triggeringPlayerId, outOfTiles) => {
+  const calculateEndgame = (currentPlayers, triggeringPlayerId, outOfTiles, history = []) => {
     const updated = JSON.parse(JSON.stringify(currentPlayers));
     let outBonus = 0;
     const details = [];
@@ -1179,16 +1181,43 @@ export default function App() {
     }
 
     const playerList = Object.values(updated).sort((a, b) => b.score - a.score);
+    let scorecardStr = "";
     if (playerList.length >= 2) {
       const winner = playerList[0];
       const losers = playerList.slice(1);
       const losersStr = losers.map(l => `${l.name} is garbage.`).join(' ');
       details.push(`\n\nTHE CHAMP IS HERE. THE CHAMP IS HERE. ${winner.name} is the winner.\n${losersStr}`);
+      
+      // Generate scorecard text
+      const sc = [];
+      sc.push("----------------------------------------");
+      sc.push("           FINAL SCORE CARD             ");
+      sc.push("----------------------------------------");
+      playerList.forEach((p, idx) => {
+        sc.push(`${idx + 1}. ${p.name}: ${p.score} pts`);
+      });
+      sc.push("----------------------------------------");
+      sc.push("         TURN-BY-TURN RECAP             ");
+      sc.push("----------------------------------------");
+      
+      history.forEach(item => {
+        if (item.type === 'turn') {
+          const wordsStr = (item.words || []).map(w => `"${w.word}"`).join(', ');
+          sc.push(`${item.playerName} played ${wordsStr || 'word'} for ${item.points} points`);
+        } else if (item.type === 'pass') {
+          sc.push(`${item.playerName}: skipped`);
+        } else if (item.type === 'exchange') {
+          sc.push(`${item.playerName}: exchanged tiles`);
+        }
+      });
+      sc.push("----------------------------------------");
+      scorecardStr = sc.join("\n");
     }
 
     return { 
       players: updated, 
-      detailsStr: details.join(' ')
+      detailsStr: details.join(' '),
+      scorecardStr
     };
   };
 
@@ -1213,6 +1242,10 @@ export default function App() {
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
     const updatedBoard = { ...roomData.board };
     const myPlayer = roomData.players[user.uid];
+    if (!myPlayer) {
+      setError("Player data not found.");
+      return;
+    }
     const myRack = [...myPlayer.rack];
     const myDeck = [...myPlayer.deck];
 
@@ -1243,7 +1276,7 @@ export default function App() {
     const currentIndex = roomData.playerOrder.indexOf(user.uid);
     const nextPlayerId = roomData.playerOrder[(currentIndex + 1) % roomData.playerOrder.length] || user.uid;
     const turnPoints = scoreData.totalScore;
-    const finalScore = myPlayer.score + turnPoints;
+    const finalScore = (myPlayer.score || 0) + turnPoints;
 
     // Fetch definitions for history asynchronously
     const wordsWithDefs = await Promise.all(scoreData.words.map(async (w) => {
@@ -1270,13 +1303,15 @@ export default function App() {
       deck: myDeck
     };
 
-    // Prepare History action
+    // Prepare History action (structured for scorecard)
     const historyItem = {
       id: Math.random().toString(),
       timestamp: Date.now(),
       type: 'turn',
       message: turnMessage,
       playerName: myPlayer.name,
+      playerUid: user.uid,
+      words: scoreData.words.map(w => ({ word: w.forwardWord, score: w.score })),
       points: turnPoints
     };
 
@@ -1293,7 +1328,7 @@ export default function App() {
     };
 
     if (isGameOver) {
-      const { players: finalPlayers, detailsStr } = calculateEndgame(updatedPlayers, user.uid, true);
+      const { players: finalPlayers, detailsStr, scorecardStr } = calculateEndgame(updatedPlayers, user.uid, true, [...roomData.history, historyItem]);
       finalUpdateObj.players = finalPlayers;
       finalUpdateObj.status = 'finished';
       finalUpdateObj.history.push({
@@ -1302,6 +1337,14 @@ export default function App() {
         type: 'system',
         message: `GAME OVER! ${myPlayer.name} used their last tile. ${detailsStr}`
       });
+      if (scorecardStr) {
+        finalUpdateObj.history.push({
+          id: Math.random().toString(),
+          timestamp: Date.now() + 2,
+          type: 'scorecard',
+          message: scorecardStr
+        });
+      }
     }
 
     try {
@@ -1330,7 +1373,9 @@ export default function App() {
       id: Math.random().toString(),
       timestamp: Date.now(),
       type: 'pass',
-      message: `${myPlayer.name} passed their turn.`
+      message: `${myPlayer.name} passed their turn.`,
+      playerName: myPlayer.name,
+      playerUid: user.uid
     };
 
     const newConsecutiveZero = (roomData.consecutiveZeroTurns || 0) + 1;
@@ -1346,7 +1391,7 @@ export default function App() {
     };
 
     if (isGameOver) {
-      const { players: finalPlayers, detailsStr } = calculateEndgame(roomData.players, null, false);
+      const { players: finalPlayers, detailsStr, scorecardStr } = calculateEndgame(roomData.players, null, false, [...roomData.history, historyItem]);
       finalUpdateObj.players = finalPlayers;
       finalUpdateObj.status = 'finished';
       finalUpdateObj.history.push({
@@ -1355,6 +1400,14 @@ export default function App() {
         type: 'system',
         message: `GAME OVER! ${maxPasses} consecutive zero-score turns passed. ${detailsStr}`
       });
+      if (scorecardStr) {
+        finalUpdateObj.history.push({
+          id: Math.random().toString(),
+          timestamp: Date.now() + 2,
+          type: 'scorecard',
+          message: scorecardStr
+        });
+      }
     }
 
     try {
@@ -1363,6 +1416,63 @@ export default function App() {
       showTemporarySuccess("You passed your turn.");
     } catch (err) {
       setError("Pass action failed: " + err.message);
+    }
+  };
+
+  // Skip turn action on behalf of another player who timed out/disconnected
+  const handlePassTurnForPlayer = async (targetPlayerId) => {
+    if (!roomData || !roomId) return;
+    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
+    const currentIndex = roomData.playerOrder.indexOf(targetPlayerId);
+    const nextPlayerId = roomData.playerOrder[(currentIndex + 1) % roomData.playerOrder.length] || targetPlayerId;
+    const targetPlayer = roomData.players[targetPlayerId];
+    if (!targetPlayer) return;
+
+    const historyItem = {
+      id: Math.random().toString(),
+      timestamp: Date.now(),
+      type: 'pass',
+      message: `${targetPlayer.name} passed their turn (timer expired / disconnected).`,
+      playerName: targetPlayer.name,
+      playerUid: targetPlayerId
+    };
+
+    const newConsecutiveZero = (roomData.consecutiveZeroTurns || 0) + 1;
+    const maxPasses = (roomData.maxPlayers || 2) * 3;
+    const isGameOver = newConsecutiveZero >= maxPasses;
+
+    let finalUpdateObj = {
+      activePlayerId: nextPlayerId,
+      turnStartTime: Date.now(),
+      history: [...roomData.history, historyItem],
+      turnIndex: roomData.turnIndex + 1,
+      consecutiveZeroTurns: newConsecutiveZero
+    };
+
+    if (isGameOver) {
+      const { players: finalPlayers, detailsStr, scorecardStr } = calculateEndgame(roomData.players, null, false, [...roomData.history, historyItem]);
+      finalUpdateObj.players = finalPlayers;
+      finalUpdateObj.status = 'finished';
+      finalUpdateObj.history.push({
+        id: Math.random().toString(),
+        timestamp: Date.now() + 1,
+        type: 'system',
+        message: `GAME OVER! ${maxPasses} consecutive zero-score turns passed. ${detailsStr}`
+      });
+      if (scorecardStr) {
+        finalUpdateObj.history.push({
+          id: Math.random().toString(),
+          timestamp: Date.now() + 2,
+          type: 'scorecard',
+          message: scorecardStr
+        });
+      }
+    }
+
+    try {
+      await updateDoc(roomRef, finalUpdateObj);
+    } catch (err) {
+      console.error("Pass action on behalf of player failed:", err);
     }
   };
 
@@ -1401,7 +1511,9 @@ export default function App() {
       id: Math.random().toString(),
       timestamp: Date.now(),
       type: 'exchange',
-      message: `${myPlayer.name} exchanged ${tilesToReturn.length} tiles.`
+      message: `${myPlayer.name} exchanged ${tilesToReturn.length} tiles.`,
+      playerName: myPlayer.name,
+      playerUid: user.uid
     };
 
     const updatedPlayers = { ...roomData.players };
@@ -1425,7 +1537,7 @@ export default function App() {
     };
 
     if (isGameOver) {
-      const { players: finalPlayers, detailsStr } = calculateEndgame(updatedPlayers, null, false);
+      const { players: finalPlayers, detailsStr, scorecardStr } = calculateEndgame(updatedPlayers, null, false, [...roomData.history, historyItem]);
       finalUpdateObj.players = finalPlayers;
       finalUpdateObj.status = 'finished';
       finalUpdateObj.history.push({
@@ -1434,6 +1546,14 @@ export default function App() {
         type: 'system',
         message: `GAME OVER! ${maxPasses} consecutive zero-score turns passed. ${detailsStr}`
       });
+      if (scorecardStr) {
+        finalUpdateObj.history.push({
+          id: Math.random().toString(),
+          timestamp: Date.now() + 2,
+          type: 'scorecard',
+          message: scorecardStr
+        });
+      }
     }
 
     try {
@@ -1519,8 +1639,9 @@ export default function App() {
   // Real-time placement scoring evaluation
   const scoreReport = roomData ? getFormedWordsAndScores() : null;
 
-  // Turn Timer Logic
+  // Turn Timer & Auto-Pass Logic
   const [remainingTime, setRemainingTime] = useState(0);
+  const lastPassedTurnIndexRef = useRef(-1);
 
   useEffect(() => {
     if (!roomData || roomData.status !== 'playing' || !roomData.timerEnabled) return;
@@ -1531,16 +1652,69 @@ export default function App() {
       const left = Math.max(0, roomData.timerDuration - passed);
       setRemainingTime(left);
 
-      // Auto-pass if time is up and it is MY turn
-      if (left === 0 && roomData.activePlayerId === user?.uid) {
-        handlePassTurn();
+      // Auto-pass if time is up
+      if (left === 0) {
+        if (roomData.activePlayerId === user?.uid) {
+          if (lastPassedTurnIndexRef.current !== roomData.turnIndex) {
+            lastPassedTurnIndexRef.current = roomData.turnIndex;
+            handlePassTurn();
+          }
+        } else {
+          // If it is NOT my turn, check if the active player is disconnected (inactive for 15s)
+          const activePlayer = roomData.players[roomData.activePlayerId];
+          const isDisconnected = !activePlayer || !activePlayer.lastActive || (Date.now() - activePlayer.lastActive > 15000);
+          if (isDisconnected) {
+            // Find connected standby players who are not the active player
+            const connectedNonActive = roomData.playerOrder.filter(uid => {
+              if (uid === roomData.activePlayerId) return false;
+              const p = roomData.players[uid];
+              return p && p.lastActive && (Date.now() - p.lastActive <= 15000);
+            });
+            // First standby connected player triggers pass on behalf of target
+            if (connectedNonActive[0] === user?.uid) {
+              if (lastPassedTurnIndexRef.current !== roomData.turnIndex) {
+                lastPassedTurnIndexRef.current = roomData.turnIndex;
+                handlePassTurnForPlayer(roomData.activePlayerId);
+              }
+            }
+          }
+        }
       }
     };
 
     tick();
     const intervalId = setInterval(tick, 1000);
     return () => clearInterval(intervalId);
-  }, [roomData?.status, roomData?.timerEnabled, roomData?.turnStartTime, roomData?.timerDuration, roomData?.activePlayerId, user?.uid]);
+  }, [roomData?.status, roomData?.timerEnabled, roomData?.turnStartTime, roomData?.timerDuration, roomData?.activePlayerId, user?.uid, roomData?.players, roomData?.playerOrder]);
+
+  // Online Presence Heartbeat Effect
+  useEffect(() => {
+    if (!roomData || !roomId || !user) return;
+    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
+    
+    const setHeartbeat = async () => {
+      try {
+        await updateDoc(roomRef, {
+          [`players.${user.uid}.lastActive`]: Date.now()
+        });
+      } catch (e) {
+        console.error("Initial heartbeat error:", e);
+      }
+    };
+    setHeartbeat();
+
+    const intervalId = setInterval(async () => {
+      try {
+        await updateDoc(roomRef, {
+          [`players.${user.uid}.lastActive`]: Date.now()
+        });
+      } catch (e) {
+        console.error("Interval heartbeat error:", e);
+      }
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [roomId, user?.uid]);
 
   // Responsive Board Calculations
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 768);
@@ -2153,9 +2327,9 @@ export default function App() {
                                 className="absolute inset-0 bg-[#d7be8a] border border-[#bfa573] rounded-sm text-[#2d2008] flex flex-col items-center justify-center font-extrabold shadow scale-[0.96]"
                                 style={{ fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif' }}
                               >
-                                <span className="leading-none" style={{ fontSize: `${cellSize * 0.55}px` }}>{permTile.letter}</span>
+                                <span className={`leading-none ${permTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.55}px` }}>{permTile.letter}</span>
                                 <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.24}px`, bottom: `${cellSize * 0.06}px`, right: `${cellSize * 0.06}px` }}>{permTile.score}</span>
-                                {permTile.isBlank && <span className="absolute bg-[#8f3636] rounded-full" style={{ top: `${cellSize * 0.06}px`, right: `${cellSize * 0.06}px`, width: `${cellSize * 0.12}px`, height: `${cellSize * 0.12}px` }} title="Blank representation" />}
+                                {permTile.isBlank && <span className="absolute bg-amber-500 rounded-full ring-1 ring-white/30" style={{ top: `${cellSize * 0.06}px`, right: `${cellSize * 0.06}px`, width: `${cellSize * 0.14}px`, height: `${cellSize * 0.14}px` }} title="Blank representation" />}
                               </div>
                             )}
 
@@ -2165,9 +2339,9 @@ export default function App() {
                                 className="absolute inset-0 bg-[#e3cb98] border-2 border-amber-500 rounded-sm text-[#2d2008] flex flex-col items-center justify-center font-extrabold shadow scale-[0.96] ring-1 ring-[#4f5666]"
                                 style={{ fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif' }}
                               >
-                                <span className="leading-none" style={{ fontSize: `${cellSize * 0.55}px` }}>{tempTile.letter}</span>
+                                <span className={`leading-none ${tempTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.55}px` }}>{tempTile.letter}</span>
                                 <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.24}px`, bottom: `${cellSize * 0.06}px`, right: `${cellSize * 0.06}px` }}>{tempTile.score}</span>
-                                {tempTile.isBlank && <span className="absolute bg-[#8f3636] rounded-full" style={{ top: `${cellSize * 0.06}px`, right: `${cellSize * 0.06}px`, width: `${cellSize * 0.12}px`, height: `${cellSize * 0.12}px` }} />}
+                                {tempTile.isBlank && <span className="absolute bg-amber-500 rounded-full ring-1 ring-white/30" style={{ top: `${cellSize * 0.06}px`, right: `${cellSize * 0.06}px`, width: `${cellSize * 0.14}px`, height: `${cellSize * 0.14}px` }} />}
                               </div>
                             )}
 
@@ -2225,7 +2399,7 @@ export default function App() {
 
                           {/* Indicator for blanks */}
                           {tile.letter === '_' && (
-                            <span className="absolute top-1 left-1.5 w-2 h-2 rounded-full bg-slate-500/50" />
+                            <span className="absolute top-1 left-1.5 w-2.5 h-2.5 rounded-full bg-amber-500 ring-1 ring-white/30" />
                           )}
                         </button>
                       );
@@ -2376,10 +2550,58 @@ export default function App() {
                   >
                     🚀 Play Word
                   </button>
-
                 </div>
 
               </div>
+
+              {/* Interactive endgame visual scorecard */}
+              {roomData.status === 'finished' && (
+                <div className={`border p-5 rounded-2xl shadow-xl space-y-4 border-indigo-500/40 bg-indigo-950/20 backdrop-blur transition-all duration-300`}>
+                  <h3 className="text-base font-extrabold text-indigo-400 flex items-center gap-2">
+                    🏆 Final Game Scorecard
+                  </h3>
+                  <div className="space-y-2">
+                    {Object.values(roomData.players).sort((a, b) => b.score - a.score).map((p, idx) => (
+                      <div key={p.uid} className="flex justify-between items-center bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-slate-300">{idx + 1}. {p.name}</span>
+                          {idx === 0 && <span className="text-xs">👑</span>}
+                        </div>
+                        <span className="text-sm font-black text-indigo-300">{p.score} pts</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-slate-800">
+                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Turn-by-Turn Recap</h4>
+                    <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1 text-[11px] font-mono leading-relaxed text-slate-300">
+                      {roomData.history.filter(h => ['turn', 'pass', 'exchange'].includes(h.type)).map((item, idx) => {
+                        if (item.type === 'turn') {
+                          const wordsStr = (item.words || []).map(w => `"${w.word}"`).join(', ');
+                          return (
+                            <div key={item.id || idx}>
+                              <span className="text-indigo-400 font-bold">{item.playerName}</span>: played {wordsStr || 'word'} for <span className="text-emerald-400 font-bold">{item.points} pts</span>
+                            </div>
+                          );
+                        } else if (item.type === 'pass') {
+                          return (
+                            <div key={item.id || idx} className="text-slate-500">
+                              <span className="text-indigo-400 font-bold">{item.playerName}</span>: skipped
+                            </div>
+                          );
+                        } else if (item.type === 'exchange') {
+                          return (
+                            <div key={item.id || idx} className="text-slate-500">
+                              <span className="text-indigo-400 font-bold">{item.playerName}</span>: exchanged tiles
+                            </div>
+                          );
+                        }
+                        return null;
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
 
             </div>
 
@@ -2392,8 +2614,6 @@ export default function App() {
               }`}>
                 <h3 className={`text-sm font-bold uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Scoreboard</h3>
                 <div className="space-y-3">
-
-                  {/* Current Active Player */}
                   <div className={`p-4 rounded-xl border flex items-center justify-between transition ${
                     roomData.activePlayerId === user.uid
                       ? isDark
@@ -2416,7 +2636,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Opponent Players */}
                   {roomData.playerOrder.filter(id => id !== user.uid).map((oppId, idx) => {
                     const opp = roomData.players[oppId];
                     if (!opp) return null;
@@ -2454,32 +2673,6 @@ export default function App() {
                       Waiting for opponents...
                     </div>
                   )}
-
-                </div>
-              </div>
-
-              {/* Game Settings Display Card */}
-              <div className={`border p-4 rounded-2xl text-xs space-y-2 transition-colors ${
-                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
-              }`}>
-                <h4 className={`font-bold uppercase tracking-widest mb-1.5 transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Game Settings</h4>
-                <div className="grid grid-cols-2 gap-2 text-slate-350">
-                  <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
-                    <span className="text-slate-500 block">Grid Size:</span>
-                    <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.gridSize}x{roomData.gridSize}</span>
-                  </div>
-                  <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
-                    <span className="text-slate-500 block">Rack Size:</span>
-                    <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.rackSize} tiles</span>
-                  </div>
-                  <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
-                    <span className="text-slate-500 block">Diagonals:</span>
-                    <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.diagonalAllowed ? 'Allowed' : 'Disabled'}</span>
-                  </div>
-                  <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
-                    <span className="text-slate-500 block">Backwards:</span>
-                    <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.backwardsAllowed ? 'Allowed' : (roomData.diagonalBackwardsAllowed ? 'Diag Only' : 'Disabled')}</span>
-                  </div>
                 </div>
               </div>
 
@@ -2549,10 +2742,15 @@ export default function App() {
                     if (item.type === 'turn') color = isDark ? 'text-[#4ade80] font-semibold' : 'text-emerald-700 font-semibold';
                     if (item.type === 'pass') color = isDark ? 'text-slate-500' : 'text-slate-400';
                     if (item.type === 'exchange') color = isDark ? 'text-sky-400' : 'text-sky-700';
+                    if (item.type === 'scorecard') color = isDark ? 'text-indigo-300 whitespace-pre border-t border-b border-indigo-900/50 py-2' : 'text-indigo-800 whitespace-pre border-t border-b border-indigo-100 py-2';
 
                     return (
                       <div key={item.id || idx} className={`${color} leading-tight`}>
-                        [{new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}] {item.message}
+                        {item.type === 'scorecard' ? (
+                          item.message
+                        ) : (
+                          `[${new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}] ${item.message}`
+                        )}
                       </div>
                     );
                   })}
@@ -2569,10 +2767,9 @@ export default function App() {
                   <h3 className={`text-sm font-bold uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>💬 Room Chat</h3>
                 </div>
 
-                {/* Messages panel */}
                 <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3">
                   {(roomData.chat || []).length === 0 ? (
-                    <p className={`text-xs italic text-center my-auto transition-colors ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>No messages yet. Say hi!</p>
+                    <p className={`text-xs italic text-center my-auto transition-colors ${isDark ? 'text-slate-650' : 'text-slate-400'}`}>No messages yet. Say hi!</p>
                   ) : (
                     roomData.chat.map((msg) => {
                       const isMe = msg.senderId === user.uid;
@@ -2587,8 +2784,8 @@ export default function App() {
                           <div className={`mt-0.5 max-w-[85%] px-3 py-1.5 rounded-2xl text-xs leading-normal ${
                             isMe
                               ? isDark
-                                ? 'bg-slate-300 text-slate-950 rounded-tr-none'
-                                : 'bg-slate-200 text-slate-900 border border-slate-300 rounded-tr-none'
+                                ? 'bg-slate-300 text-slate-955 rounded-tr-none'
+                                : 'bg-slate-205 text-slate-900 border border-slate-300 rounded-tr-none'
                               : isDark
                                 ? 'bg-slate-800 text-slate-200 rounded-tl-none'
                                 : 'bg-white text-slate-800 border border-slate-200 rounded-tl-none'
@@ -2599,10 +2796,8 @@ export default function App() {
                       );
                     })
                   )}
-
                 </div>
 
-                {/* Submit text */}
                 <form onSubmit={sendChatMessage} className={`border-t p-2 flex gap-2 transition-colors ${
                   isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-100 border-slate-200'
                 }`}>
@@ -2629,6 +2824,31 @@ export default function App() {
                     Send
                   </button>
                 </form>
+              </div>
+
+              {/* Game Settings Display Card (moved to bottom) */}
+              <div className={`border p-4 rounded-2xl text-xs space-y-2 transition-colors ${
+                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+              }`}>
+                <h4 className={`font-bold uppercase tracking-widest mb-1.5 transition-colors ${isDark ? 'text-slate-400' : 'text-slate-505'}`}>Game Settings</h4>
+                <div className="grid grid-cols-2 gap-2 text-slate-350">
+                  <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
+                    <span className="text-slate-550 block">Grid Size:</span>
+                    <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.gridSize}x{roomData.gridSize}</span>
+                  </div>
+                  <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
+                    <span className="text-slate-550 block">Rack Size:</span>
+                    <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.rackSize} tiles</span>
+                  </div>
+                  <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
+                    <span className="text-slate-550 block">Diagonals:</span>
+                    <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.diagonalAllowed ? 'Allowed' : 'Disabled'}</span>
+                  </div>
+                  <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
+                    <span className="text-slate-550 block">Backwards:</span>
+                    <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.backwardsAllowed ? 'Allowed' : (roomData.diagonalBackwardsAllowed ? 'Diag Only' : 'Disabled')}</span>
+                  </div>
+                </div>
               </div>
 
             </div>
