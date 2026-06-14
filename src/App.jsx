@@ -622,7 +622,7 @@ export default function App() {
   };
 
   // --- TILE PLACEMENT ACTIONS ---
-  const selectRackTile = (tileIndex) => {
+  const selectRackTile = async (tileIndex) => {
     if (exchangeMode) {
       const tile = roomData.players[user.uid].rack[tileIndex];
       if (selectedExchangeIds.includes(tile.id)) {
@@ -631,7 +631,33 @@ export default function App() {
         setSelectedExchangeIds([...selectedExchangeIds, tile.id]);
       }
     } else {
-      setSelectedRackTile(tileIndex);
+      if (selectedRackTile === null) {
+        setSelectedRackTile(tileIndex);
+      } else if (selectedRackTile === tileIndex) {
+        // Deselect if clicked again
+        setSelectedRackTile(null);
+      } else {
+        // Swap tiles!
+        const myPlayer = roomData?.players?.[user.uid];
+        if (!myPlayer) return;
+        const newRack = [...myPlayer.rack];
+        
+        const temp = newRack[selectedRackTile];
+        newRack[selectedRackTile] = newRack[tileIndex];
+        newRack[tileIndex] = temp;
+        
+        setSelectedRackTile(null);
+
+        // Save new rack order to Firestore
+        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
+        try {
+          await updateDoc(roomRef, {
+            [`players.${user.uid}.rack`]: newRack
+          });
+        } catch (e) {
+          console.error("Failed to update rearranged rack order:", e);
+        }
+      }
     }
   };
 
