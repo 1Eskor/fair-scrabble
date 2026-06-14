@@ -223,7 +223,7 @@ const getBonus = (r, c, size) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [username, setUsername] = useState('');
-  const [roomId, setRoomId] = useState('');
+  const [roomId, setRoomId] = useState(() => localStorage.getItem('active_room_id') || '');
   const [roomData, setRoomData] = useState(null);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -248,6 +248,10 @@ export default function App() {
   const [threePlayerMode, setThreePlayerMode] = useState(false);
   const [evenDistributionMode, setEvenDistributionMode] = useState(false);
   const [joinInput, setJoinInput] = useState('');
+  const [handicapEnabled, setHandicapEnabled] = useState(false);
+  const [handicapP1, setHandicapP1] = useState(0);
+  const [handicapP2, setHandicapP2] = useState(0);
+  const [handicapP3, setHandicapP3] = useState(0);
 
   // Local Game State
   const [selectedRackTile, setSelectedRackTile] = useState(null);
@@ -324,10 +328,18 @@ export default function App() {
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
     const unsubscribe = onSnapshot(roomRef, (snapshot) => {
       if (snapshot.exists()) {
-        setRoomData(snapshot.data());
-        setError('');
+        const data = snapshot.data();
+        if (data.players && data.players[user.uid]) {
+          setRoomData(data);
+          setError('');
+        } else {
+          localStorage.removeItem('active_room_id');
+          setRoomId('');
+          setRoomData(null);
+        }
       } else {
         setError("Room has been disbanded or does not exist.");
+        localStorage.removeItem('active_room_id');
         setRoomId('');
         setRoomData(null);
       }
@@ -391,11 +403,13 @@ export default function App() {
       timerDuration: config.timerDuration,
       turnStartTime: Date.now(),
       status: 'waiting',
+      handicapEnabled: !!config.handicapEnabled,
+      handicaps: config.handicapEnabled ? config.handicaps : [0, 0, 0],
       players: {
         [user.uid]: {
           uid: user.uid,
           name: username,
-          score: 0,
+          score: config.handicapEnabled ? (config.handicaps?.[0] || 0) : 0,
           deck: decks.deck1,
           rack: [],
           isReady: false,
@@ -421,6 +435,7 @@ export default function App() {
 
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', newRoomId), initialRoom);
+      localStorage.setItem('active_room_id', newRoomId);
       setRoomId(newRoomId);
       showTemporarySuccess("Room created successfully!");
     } catch (err) {
@@ -463,10 +478,12 @@ export default function App() {
         const myDeckKey = `deck${currentCount + 1}`;
         const myDeck = decks[myDeckKey];
 
+        const initialScore = (data.handicapEnabled && data.handicaps) ? (data.handicaps[currentCount] || 0) : 0;
+
         updatedPlayers[user.uid] = {
           uid: user.uid,
           name: username,
-          score: 0,
+          score: initialScore,
           deck: myDeck,
           rack: [],
           isReady: true,
@@ -493,6 +510,7 @@ export default function App() {
             }
           ]
         });
+        localStorage.setItem('active_room_id', cleanId);
         setRoomId(cleanId);
         showTemporarySuccess("Joined room. Waiting for players...");
         return;
@@ -533,6 +551,7 @@ export default function App() {
         ]
       });
 
+      localStorage.setItem('active_room_id', cleanId);
       setRoomId(cleanId);
     } catch (err) {
       setError("Failed to join room: " + err.message);
@@ -567,6 +586,7 @@ export default function App() {
           ]
         });
       }
+      localStorage.removeItem('active_room_id');
       setRoomId('');
       setRoomData(null);
       setTentativePlaced({});
@@ -1584,7 +1604,27 @@ export default function App() {
       const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word.toLowerCase()}`);
       if (res.ok) {
         const data = await res.json();
-        return data[0]?.meanings?.[0]?.definitions?.[0]?.definition || null;
+        if (Array.isArray(data) && data.length > 0) {
+          const meaningsList = [];
+          data.forEach(entry => {
+            if (entry.meanings) {
+              entry.meanings.forEach(meaning => {
+                const pos = meaning.partOfSpeech || "";
+                if (meaning.definitions) {
+                  meaning.definitions.slice(0, 2).forEach(defObj => {
+                    if (defObj.definition) {
+                      meaningsList.push(`[${pos}] ${defObj.definition}`);
+                    }
+                  });
+                }
+              });
+            }
+          });
+          const uniqueMeanings = [...new Set(meaningsList)];
+          if (uniqueMeanings.length > 0) {
+            return uniqueMeanings.slice(0, 3).join("; ");
+          }
+        }
       }
     } catch (e) {}
     return null;
@@ -2049,6 +2089,71 @@ export default function App() {
                 </div>
 
                 <div className="space-y-2">
+                  <div className={`flex items-center justify-between p-3 rounded-xl border transition-colors cursor-pointer ${
+                    isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-50 border-slate-200'
+                  }`} onClick={() => setHandicapEnabled(!handicapEnabled)}>
+                    <span className={`text-sm font-bold flex items-center gap-2 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                      🎁 Handicap Mode
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={handicapEnabled}
+                      onChange={(e) => setHandicapEnabled(e.target.checked)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="accent-slate-500 h-4 w-4"
+                    />
+                  </div>
+
+                  {handicapEnabled && (
+                    <div className={`p-4 rounded-xl border space-y-3 transition-colors ${
+                      isDark ? 'bg-[#111317]/50 border-[#21252d]' : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Player 1:</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="1000"
+                          value={handicapP1}
+                          onChange={(e) => setHandicapP1(Math.min(1000, Math.max(0, parseInt(e.target.value, 10) || 0)))}
+                          className={`text-xs rounded-lg p-1.5 border font-bold w-20 text-center ${
+                            isDark ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Player 2:</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="1000"
+                          value={handicapP2}
+                          onChange={(e) => setHandicapP2(Math.min(1000, Math.max(0, parseInt(e.target.value, 10) || 0)))}
+                          className={`text-xs rounded-lg p-1.5 border font-bold w-20 text-center ${
+                            isDark ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
+                        />
+                      </div>
+                      {threePlayerMode && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Player 3:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="1000"
+                            value={handicapP3}
+                            onChange={(e) => setHandicapP3(Math.min(1000, Math.max(0, parseInt(e.target.value, 10) || 0)))}
+                            className={`text-xs rounded-lg p-1.5 border font-bold w-20 text-center ${
+                              isDark ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-800'
+                            }`}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
                   <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${
                     isDark ? 'text-slate-400' : 'text-slate-500'
                   }`}>Spell Check Mode</label>
@@ -2089,7 +2194,9 @@ export default function App() {
                     timerEnabled,
                     timerDuration,
                     threePlayerMode,
-                    evenDistributionMode
+                    evenDistributionMode,
+                    handicapEnabled,
+                    handicaps: [handicapP1, handicapP2, handicapP3]
                   })}
                   className={`w-full font-black text-sm py-3 px-4 rounded-xl shadow-lg transition active:scale-[0.98] border ${
                     isDark 
