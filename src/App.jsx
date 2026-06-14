@@ -2878,7 +2878,7 @@ export default function App() {
                 <button
                   key={char}
                   onClick={() => selectBlankLetter(char)}
-                  className="bg-gradient-to-br from-amber-100 to-amber-200 hover:from-amber-200 hover:to-amber-300 border border-amber-300 text-slate-955 font-black py-2 rounded-lg text-sm transition transform active:scale-90"
+                  className="bg-gradient-to-br from-amber-100 to-amber-200 hover:from-amber-200 hover:to-amber-300 border border-amber-300 text-[#2d2008] font-black py-2 rounded-lg text-sm transition transform active:scale-90"
                 >
                   {char}
                 </button>
