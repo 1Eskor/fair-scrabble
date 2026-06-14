@@ -68,16 +68,16 @@ const generateEvenDecks = (gridSize, numPlayers = 2, evenDistributionMode = fals
       N: 6, O: 8, P: 2, R: 6, T: 6, U: 4, V: 2, W: 2, Y: 2
     };
   } else if (size === 17) {
-    // 130 tiles total (20 specials/blanks/S + 110 standards)
+    // 146 tiles total (20 specials/blanks/S + 126 standards)
     playerSpecials = ['Z', 'Q', 'X', 'J', 'Z', 'Q', 'X', 'J'];
     playerBlanksCount = 4; 
     playerSCount = 8; 
     standardLettersPool = {
-      A: 10, B: 3, C: 3, D: 4, E: 13, F: 3, G: 3, H: 3, I: 10, K: 2, L: 4, M: 3,
-      N: 7, O: 9, P: 2, R: 7, T: 7, U: 5, V: 3, W: 3, Y: 3
+      A: 12, B: 3, C: 3, D: 5, E: 15, F: 3, G: 4, H: 3, I: 12, K: 2, L: 5, M: 3,
+      N: 8, O: 11, P: 3, R: 8, T: 8, U: 6, V: 3, W: 3, Y: 3
     };
   } else {
-    // 19x19 Grid: 160 tiles total (34 specials/blanks/S + 126 standards)
+    // 19x19 Grid: 180 tiles total (34 specials/blanks/S + 146 standards)
     playerSpecials = [
       'Z', 'Q', 'X', 'J', 'Z', 'Q', 'X', 'J',
       'Z', 'Q', 'X', 'J', 'Z', 'Q', 'X', 'J'
@@ -85,8 +85,8 @@ const generateEvenDecks = (gridSize, numPlayers = 2, evenDistributionMode = fals
     playerBlanksCount = 6; 
     playerSCount = 12; 
     standardLettersPool = {
-      A: 12, B: 3, C: 3, D: 5, E: 14, F: 3, G: 4, H: 4, I: 12, K: 2, L: 5, M: 4,
-      N: 8, O: 10, P: 3, R: 8, T: 8, U: 6, V: 4, W: 4, Y: 4
+      A: 14, B: 4, C: 4, D: 6, E: 17, F: 4, G: 5, H: 4, I: 14, K: 2, L: 6, M: 4,
+      N: 9, O: 12, P: 4, R: 9, T: 9, U: 7, V: 4, W: 4, Y: 4
     };
   }
 
@@ -2095,8 +2095,8 @@ export default function App() {
                   <div className="grid grid-cols-3 gap-2">
                     {[
                       { size: 15, label: '15x15 (Standard)', tiles: '100 tiles • 7 rack' },
-                      { size: 17, label: '17x17 Grid', tiles: '130 tiles • 8 rack' },
-                      { size: 19, label: '19x19 Grid', tiles: '160 tiles • 9 rack' }
+                      { size: 17, label: '17x17 Grid', tiles: '146 tiles • 8 rack' },
+                      { size: 19, label: '19x19 Grid', tiles: '180 tiles • 9 rack' }
                     ].map(opt => {
                       const isActive = selectedGridSize === opt.size;
                       return (
