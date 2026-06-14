@@ -2004,7 +2004,7 @@ export default function App() {
     const gridSize = roomData?.gridSize || 15;
     if (isMobile) {
       // Calculate mobile cell size dynamically so the board fits perfectly on the screen
-      const totalPaddingAndBorders = 60; // 32px (main layout) + 12px (card padding) + 12px (inner board padding) + 4px (borders)
+      const totalPaddingAndBorders = 6; // 0px (main layout) + 0px (card padding) + 4px (inner board padding) + 2px (borders)
       const gapSize = 2;
       const availableSpaceForCells = windowWidth - totalPaddingAndBorders - (gridSize - 1) * gapSize;
       const calculatedBase = Math.floor(availableSpaceForCells / gridSize);
@@ -2123,7 +2123,7 @@ export default function App() {
       </header>
 
       {/* --- MAIN BODY --- */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col gap-6">
+      <main className={`flex-1 max-w-7xl w-full mx-auto py-4 sm:p-4 md:p-6 flex flex-col gap-6 ${roomData ? 'px-0' : 'px-4'}`}>
 
         {/* Global Notifications */}
         {error && (
@@ -2634,10 +2634,10 @@ export default function App() {
               </div>
 
               {/* Interactive Scrabble Board Display */}
-              <div className={`w-full p-1.5 md:p-6 rounded-2xl shadow-2xl overflow-auto flex border transition-colors ${
-                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+              <div className={`w-full p-0 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-2xl overflow-auto flex border-0 md:border transition-colors ${
+                isDark ? 'bg-[#15181d] md:border-[#21252d]' : 'bg-white md:border-slate-200'
               }`}>
-                <div className={`select-none p-1.5 md:p-2 rounded-xl border transition-colors mx-auto ${
+                <div className={`select-none p-0.5 md:p-2 rounded-lg md:rounded-xl border transition-colors mx-auto ${
                   isDark ? 'bg-[#111317] border-slate-900' : 'bg-slate-200 border-slate-300'
                 }`}>
                   <div
