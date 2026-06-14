@@ -2730,7 +2730,7 @@ export default function App() {
               </div>
 
               {/* Rack Controls Section */}
-              <div className={`w-full border px-1 py-4 sm:px-3 md:px-4 md:py-6 rounded-2xl shadow-xl space-y-4 transition-all duration-300 ${
+              <div className={`w-full border px-0.5 py-4 sm:px-3 md:px-4 md:py-6 rounded-2xl shadow-xl space-y-4 transition-all duration-300 ${
                 shouldFlashRed
                   ? isDark ? 'bg-[#7f1d1d] border-[#991b1b]' : 'bg-[#fee2e2] border-[#fca5a5]'
                   : isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
@@ -2742,28 +2742,28 @@ export default function App() {
                     {exchangeMode ? "Select Tiles to Exchange" : "Your Tile Rack"}
                   </span>
 
-                  <div className={`flex items-center justify-center gap-0.5 sm:gap-1.5 md:gap-2 px-1 py-1.5 sm:px-2 sm:py-2 md:px-3 md:py-3 rounded-2xl border shadow-inner w-full overflow-x-hidden transition-colors ${
+                  <div className={`flex items-center justify-center gap-1.5 sm:gap-2 md:gap-2.5 px-0 py-1.5 sm:py-2 md:py-3 rounded-md border shadow-inner w-full overflow-x-hidden transition-colors ${
                     isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-100 border-slate-200'
                   }`}>
                     {(() => {
                       const rackSize = roomData?.gridSize === 15 ? 7 : (roomData?.gridSize === 17 ? 8 : 9);
                       const letterSizeClass = rackSize === 9 
-                        ? "text-xs sm:text-sm md:text-base lg:text-lg"
+                        ? "text-sm sm:text-base md:text-lg lg:text-xl"
                         : rackSize === 8
-                          ? "text-xs sm:text-base md:text-lg lg:text-xl"
-                          : "text-sm sm:text-base md:text-lg lg:text-xl";
+                          ? "text-base sm:text-lg md:text-xl lg:text-2xl"
+                          : "text-lg sm:text-xl md:text-2xl lg:text-3xl";
 
                       const scoreSizeClass = rackSize === 9
                         ? "text-[7px] sm:text-[8px] md:text-[9px]"
                         : rackSize === 8
-                          ? "text-[7px] sm:text-[8px] md:text-[9px] lg:text-[10px]"
-                          : "text-[8px] sm:text-[9px] md:text-[10px]";
+                          ? "text-[8px] sm:text-[9px] md:text-[10px]"
+                          : "text-[9px] sm:text-[10px] md:text-[11px]";
                           
                       const maxTileWidthClass = rackSize === 9
-                        ? "max-w-[36px] sm:max-w-[42px] md:max-w-[48px]"
+                        ? "max-w-[38px] sm:max-w-[44px] md:max-w-[50px]"
                         : rackSize === 8
-                          ? "max-w-[40px] sm:max-w-[46px] md:max-w-[52px]"
-                          : "max-w-[44px] sm:max-w-[50px] md:max-w-[56px]";
+                          ? "max-w-[42px] sm:max-w-[48px] md:max-w-[54px]"
+                          : "max-w-[48px] sm:max-w-[54px] md:max-w-[60px]";
 
                       return me?.rack.map((tile, idx) => {
                         // Check if tile is tentatively placed on the board right now
