@@ -1232,11 +1232,20 @@ export default function App() {
     if (playerList.length >= 2) {
       const winner = playerList[0];
       const losers = playerList.slice(1);
-      const losersStr = losers.map(l => `${l.name} is garbage.`).join(' ');
-      details.push(`\n\nTHE CHAMP IS HERE. THE CHAMP IS HERE. ${winner.name} is the winner.\n${losersStr}`);
+      
+      let losersNamesStr = "";
+      if (losers.length === 1) {
+        losersNamesStr = losers[0].name.toUpperCase();
+      } else {
+        losersNamesStr = losers.map(l => l.name.toUpperCase()).slice(0, -1).join(", ") + " AND " + losers[losers.length - 1].name.toUpperCase();
+      }
+
+      const trashTalk = `THE CHAMP IS HERE! THE CHAMP IS HERE! THE WINNER IS ${winner.name.toUpperCase()}.\n${losersNamesStr} IS GARBAGE! WILLIAM MONTGOMERY KNOWS THEY'RE GARBAGE, BOB LAZAR KNOWS THEY'RE GARBAGE, JOE ROGAN KNOWS THEY'RE GARBAGE, G.I JOEL KNOWS THEY'RE GARBAGE, BRENDAN SCHAUB KNOWS THEY'RE GARBAGE, MARLIN HILL KNOW'S THEY'RE GARBAGE, CASEY ROCKET KNOW'S THEY'RE GARBAGE, MIRANDA COSGROVE KNOWS THEY'RE GARBAGE. EVERYONE KNOWS THEY'RE GARBAGE!`;
       
       // Generate scorecard text
       const sc = [];
+      sc.push(trashTalk);
+      sc.push("");
       sc.push("----------------------------------------");
       sc.push("           FINAL SCORE CARD             ");
       sc.push("----------------------------------------");
