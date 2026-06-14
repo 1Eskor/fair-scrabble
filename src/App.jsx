@@ -2730,7 +2730,7 @@ export default function App() {
               </div>
 
               {/* Rack Controls Section */}
-              <div className={`w-full border p-4 md:p-6 rounded-2xl shadow-xl space-y-4 transition-all duration-300 ${
+              <div className={`w-full border px-1 py-4 sm:px-3 md:px-4 md:py-6 rounded-2xl shadow-xl space-y-4 transition-all duration-300 ${
                 shouldFlashRed
                   ? isDark ? 'bg-[#7f1d1d] border-[#991b1b]' : 'bg-[#fee2e2] border-[#fca5a5]'
                   : isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
@@ -2742,42 +2742,63 @@ export default function App() {
                     {exchangeMode ? "Select Tiles to Exchange" : "Your Tile Rack"}
                   </span>
 
-                  <div className={`flex items-center gap-2 md:gap-3 p-3 rounded-2xl border shadow-inner max-w-full overflow-x-auto transition-colors ${
+                  <div className={`flex items-center justify-center gap-0.5 sm:gap-1.5 md:gap-2 px-1 py-1.5 sm:px-2 sm:py-2 md:px-3 md:py-3 rounded-2xl border shadow-inner w-full overflow-x-hidden transition-colors ${
                     isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-100 border-slate-200'
                   }`}>
-                    {me?.rack.map((tile, idx) => {
-                      // Check if tile is tentatively placed on the board right now
-                      const isPlaced = Object.values(tentativePlaced).some(t => t.id === tile.id);
-                      const isSelectedExchange = selectedExchangeIds.includes(tile.id);
+                    {(() => {
+                      const rackSize = roomData?.gridSize === 15 ? 7 : (roomData?.gridSize === 17 ? 8 : 9);
+                      const letterSizeClass = rackSize === 9 
+                        ? "text-xs sm:text-sm md:text-base lg:text-lg"
+                        : rackSize === 8
+                          ? "text-xs sm:text-base md:text-lg lg:text-xl"
+                          : "text-sm sm:text-base md:text-lg lg:text-xl";
 
-                      return (
-                        <button
-                          key={tile.id}
-                          disabled={isPlaced && !exchangeMode}
-                          onClick={() => selectRackTile(idx)}
-                          style={{ fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif' }}
-                          className={`w-10 h-12 md:w-12 md:h-14 shrink-0 rounded-sm flex flex-col items-center justify-center relative font-extrabold shadow transition transform active:scale-95 ${
-                            isPlaced
-                              ? isDark
-                                ? 'opacity-20 cursor-not-allowed bg-[#1f232b] border border-dashed border-[#2a2e37]'
-                                : 'opacity-20 cursor-not-allowed bg-slate-200 border border-dashed border-slate-350'
-                              : isSelectedExchange
-                                ? 'bg-[#782b2b] border-2 border-[#8f3636] text-white scale-105'
-                                : selectedRackTile === idx
-                                  ? 'bg-[#e3cb98] border-2 border-amber-500 text-[#2d2008] -translate-y-2 ring-4 ring-amber-500/30'
-                                  : 'bg-[#d7be8a] text-[#2d2008] border border-[#bfa573] hover:bg-[#e3cb98]'
-                          }`}
-                        >
-                          <span className="text-lg md:text-xl leading-none font-extrabold">{tile.letter === '_' ? '' : tile.letter}</span>
-                          <span className="absolute bottom-1 right-1 text-[9px] md:text-[10px] leading-none font-bold">{tile.score}</span>
+                      const scoreSizeClass = rackSize === 9
+                        ? "text-[7px] sm:text-[8px] md:text-[9px]"
+                        : rackSize === 8
+                          ? "text-[7px] sm:text-[8px] md:text-[9px] lg:text-[10px]"
+                          : "text-[8px] sm:text-[9px] md:text-[10px]";
+                          
+                      const maxTileWidthClass = rackSize === 9
+                        ? "max-w-[36px] sm:max-w-[42px] md:max-w-[48px]"
+                        : rackSize === 8
+                          ? "max-w-[40px] sm:max-w-[46px] md:max-w-[52px]"
+                          : "max-w-[44px] sm:max-w-[50px] md:max-w-[56px]";
 
-                          {/* Indicator for blanks */}
-                          {tile.letter === '_' && (
-                            <span className="absolute top-1 left-1.5 w-2.5 h-2.5 rounded-full bg-amber-500 ring-1 ring-white/30" />
-                          )}
-                        </button>
-                      );
-                    })}
+                      return me?.rack.map((tile, idx) => {
+                        // Check if tile is tentatively placed on the board right now
+                        const isPlaced = Object.values(tentativePlaced).some(t => t.id === tile.id);
+                        const isSelectedExchange = selectedExchangeIds.includes(tile.id);
+
+                        return (
+                          <button
+                            key={tile.id}
+                            disabled={isPlaced && !exchangeMode}
+                            onClick={() => selectRackTile(idx)}
+                            style={{ fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif' }}
+                            className={`w-full min-w-0 flex-1 shrink rounded-sm flex flex-col items-center justify-center relative font-extrabold shadow transition transform active:scale-95 ${maxTileWidthClass} aspect-[5/6] ${
+                              isPlaced
+                                ? isDark
+                                  ? 'opacity-20 cursor-not-allowed bg-[#1f232b] border border-dashed border-[#2a2e37]'
+                                  : 'opacity-20 cursor-not-allowed bg-slate-200 border border-dashed border-slate-350'
+                                : isSelectedExchange
+                                  ? 'bg-[#782b2b] border-2 border-[#8f3636] text-white scale-105'
+                                  : selectedRackTile === idx
+                                    ? 'bg-[#e3cb98] border-2 border-amber-500 text-[#2d2008] -translate-y-2 ring-4 ring-amber-500/30'
+                                    : 'bg-[#d7be8a] text-[#2d2008] border border-[#bfa573] hover:bg-[#e3cb98]'
+                            }`}
+                          >
+                            <span className={`${letterSizeClass} leading-none font-extrabold`}>{tile.letter === '_' ? '' : tile.letter}</span>
+                            <span className={`absolute bottom-0.5 right-0.5 md:bottom-1 md:right-1 ${scoreSizeClass} leading-none font-bold`}>{tile.score}</span>
+
+                            {/* Indicator for blanks */}
+                            {tile.letter === '_' && (
+                              <span className="absolute top-0.5 left-0.5 sm:top-1 sm:left-1 w-1.5 h-1.5 sm:w-2 sm:h-2 md:w-2.5 md:h-2.5 rounded-full bg-amber-500 ring-1 ring-white/30" />
+                            )}
+                          </button>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
 
