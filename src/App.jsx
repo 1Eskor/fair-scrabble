@@ -238,6 +238,12 @@ export default function App() {
     localStorage.setItem('scrabble_theme', nextTheme);
   };
 
+  // Colours Toggle State (defaults to true)
+  const [coloursEnabled, setColoursEnabled] = useState(() => {
+    const stored = localStorage.getItem('scrabble_colours');
+    return stored === null ? true : stored === 'true';
+  });
+
   // Lobby Pre-select State
   const [selectedGridSize, setSelectedGridSize] = useState(15);
   const [diagonalAllowed, setDiagonalAllowed] = useState(false);
@@ -1851,6 +1857,14 @@ export default function App() {
   // Real-time placement scoring evaluation
   const scoreReport = roomData ? getFormedWordsAndScores() : null;
 
+  const isWordValid = (w) => {
+    if (!roomData) return false;
+    return checkWordLocal(w.forwardWord) ||
+           (roomData.backwardsAllowed && checkWordLocal(w.backwardWord)) ||
+           (roomData.diagonalBackwardsAllowed && checkWordLocal(w.backwardWord));
+  };
+  const hasValidWord = scoreReport && scoreReport.words && scoreReport.words.some(isWordValid);
+
   // Track remaining tiles (unplayed tiles in decks and racks)
   const remainingCounts = (() => {
     if (!roomData || !roomData.players) return {};
@@ -1883,6 +1897,18 @@ export default function App() {
     if (b === '?') return -1;
     return a.localeCompare(b);
   });
+
+  // Flash red warning when timer hits 10 seconds
+  const [shouldFlashRed, setShouldFlashRed] = useState(false);
+  useEffect(() => {
+    if (coloursEnabled && remainingTime === 10) {
+      setShouldFlashRed(true);
+      const timer = setTimeout(() => {
+        setShouldFlashRed(false);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [remainingTime, coloursEnabled]);
 
   // Turn Timer & Auto-Pass Logic
   const [remainingTime, setRemainingTime] = useState(0);
@@ -2028,6 +2054,33 @@ export default function App() {
             >
               {isDark ? '☀️ Light Mode' : '🌙 Dark Mode'}
             </button>
+
+            {/* Colours Toggle Switch */}
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-bold transition ${
+              isDark 
+                ? 'bg-slate-800 border-slate-700 text-slate-200' 
+                : 'bg-slate-100 border-slate-250 text-slate-700'
+            }`}>
+              <span>🎨 Colours</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextColours = !coloursEnabled;
+                  setColoursEnabled(nextColours);
+                  localStorage.setItem('scrabble_colours', nextColours ? 'true' : 'false');
+                }}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  coloursEnabled ? 'bg-emerald-500' : 'bg-slate-400'
+                }`}
+                title="Toggle warn & validation colour features"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    coloursEnabled ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
 
             {roomData && (
               <button
@@ -2455,8 +2508,10 @@ export default function App() {
             <div className="lg:col-span-8 space-y-4 flex flex-col items-center">
 
               {/* Game Info Bar */}
-              <div className={`w-full p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl border transition-colors ${
-                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+              <div className={`w-full p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl border transition-all duration-300 ${
+                shouldFlashRed
+                  ? isDark ? 'bg-[#7f1d1d] border-[#991b1b]' : 'bg-[#fee2e2] border-[#fca5a5]'
+                  : isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
               }`}>
 
                 {/* Share Room Info */}
@@ -2680,8 +2735,10 @@ export default function App() {
                     {exchangeMode ? "Select Tiles to Exchange" : "Your Tile Rack"}
                   </span>
 
-                  <div className={`flex items-center gap-2 md:gap-3 p-3 rounded-2xl border shadow-inner max-w-full overflow-x-auto transition-colors ${
-                    isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-100 border-slate-200'
+                  <div className={`flex items-center gap-2 md:gap-3 p-3 rounded-2xl border shadow-inner max-w-full overflow-x-auto transition-all duration-300 ${
+                    shouldFlashRed
+                      ? isDark ? 'bg-[#7f1d1d] border-[#991b1b]' : 'bg-[#fee2e2] border-[#fca5a5]'
+                      : isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-100 border-slate-200'
                   }`}>
                     {me?.rack.map((tile, idx) => {
                       // Check if tile is tentatively placed on the board right now
@@ -2721,20 +2778,27 @@ export default function App() {
 
                 {/* Score Summary of Pending Play */}
                 {Object.keys(tentativePlaced).length > 0 && scoreReport && (
-                  <div className={`p-4 rounded-xl flex flex-col gap-2 border transition-colors ${
-                    isDark ? 'bg-[#111317]/80 border-[#21252d]' : 'bg-slate-50 border-slate-200 shadow-inner'
+                  <div className={`p-4 rounded-xl flex flex-col gap-2 border transition-all duration-300 ${
+                    (coloursEnabled && hasValidWord)
+                      ? isDark ? 'bg-[#064e3b]/30 border-[#059669]/30' : 'bg-[#f0fdf4] border-[#bbf7d0]'
+                      : isDark ? 'bg-[#111317]/80 border-[#21252d]' : 'bg-slate-50 border-slate-200 shadow-inner'
                   }`}>
                     <div className="flex justify-between items-center text-sm">
                       <span className={`font-bold flex items-center gap-1.5 transition-colors ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
                         <span>📝 Words formed:</span>
-                        {scoreReport.words.map((w, i) => (
-                          <span key={i} className={`px-2 py-0.5 rounded text-xs font-mono transition-colors ${
-                            isDark ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-805'
-                          }`}>
-                            {w.forwardWord} ({w.score} pts)
-                            {(roomData.backwardsAllowed || roomData.diagonalBackwardsAllowed) && w.forwardWord !== w.backwardWord && ` / ${w.backwardWord}`}
-                          </span>
-                        ))}
+                        {scoreReport.words.map((w, i) => {
+                          const valid = isWordValid(w);
+                          return (
+                            <span key={i} className={`px-2 py-0.5 rounded text-xs font-mono transition-all duration-200 border ${
+                              (coloursEnabled && valid)
+                                ? isDark ? 'bg-[#14532d] text-[#4ade80] border-[#16a34a]/30' : 'bg-[#dcfce7] text-[#15803d] border-[#bbf7d0]'
+                                : isDark ? 'bg-slate-800 border-transparent text-white' : 'bg-slate-200 border-transparent text-slate-805'
+                            }`}>
+                              {w.forwardWord} ({w.score} pts)
+                              {(roomData.backwardsAllowed || roomData.diagonalBackwardsAllowed) && w.forwardWord !== w.backwardWord && ` / ${w.backwardWord}`}
+                            </span>
+                          );
+                        })}
                       </span>
                       <span className={`font-extrabold text-base transition-colors ${isDark ? 'text-white' : 'text-slate-900'}`}>
                         +{scoreReport.totalScore} pts
