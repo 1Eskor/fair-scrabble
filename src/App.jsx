@@ -2666,9 +2666,7 @@ export default function App() {
               </div>
 
               {/* Interactive Scrabble Board Display */}
-              <div className={`w-full p-0 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-2xl overflow-auto flex border-0 md:border transition-colors ${
-                isDark ? 'bg-[#15181d] md:border-[#21252d]' : 'bg-white md:border-slate-200'
-              }`}>
+              <div className="w-full p-0 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-2xl overflow-auto flex border-0 md:border" style={{ backgroundColor: customColors.boardBg }}>
                 <div className={`select-none p-0.5 md:p-2 rounded-lg md:rounded-xl border transition-colors mx-auto ${
                   isDark ? 'bg-[#111317] border-slate-900' : 'bg-slate-200 border-slate-300'
                 }`}>
@@ -2687,47 +2685,28 @@ export default function App() {
                         const tempTile = tentativePlaced[key];
                         const bonus = getBonus(r, c, roomData.gridSize);
 
-                        // Layout styling for special squares
-                        let cellBg = '';
+                        // Layout styling for special squares — use customColors for TW/DW/DL, defaults for blank/TL
                         let cellLabel = '';
+                        let cellStyle = {};
+                        let cellClassName = 'rounded-md cursor-pointer flex flex-col items-center justify-center relative transition duration-150 shadow-sm border';
 
-                        if (isDark) {
-                          cellBg = 'bg-[#262a33] hover:bg-[#2e333e] border border-[#323743] text-slate-400';
-                          if (bonus === 'TW') {
-                            cellBg = 'bg-[#782b2b] border border-[#8f3636] text-[#e2b4b4]';
-                            cellLabel = 'TW';
-                          } else if (bonus === 'DW') {
-                            cellBg = 'bg-[#914d4d] border border-[#a85b5b] text-[#eed3d3]';
-                            cellLabel = 'DW';
-                          } else if (bonus === 'TL') {
-                            cellBg = 'bg-[#162d4c] border border-[#203c62] text-[#a8c0e0]';
-                            cellLabel = 'TL';
-                          } else if (bonus === 'DL') {
-                            cellBg = 'bg-[#26415a] border border-[#335372] text-[#bcd5eb]';
-                            cellLabel = 'DL';
-                          } else if (bonus === 'star') {
-                            cellBg = 'bg-[#914d4d] border border-[#a85b5b] text-[#eed3d3]';
-                            cellLabel = '★';
-                          }
-                        } else {
-                          // Light theme classic pastel/bright Scrabble board styling
-                          cellBg = 'bg-[#f8fafc] hover:bg-[#cbd5e1]/40 border border-slate-300 text-slate-400';
-                          if (bonus === 'TW') {
-                            cellBg = 'bg-[#f43f5e] border border-[#fda4af] text-white';
-                            cellLabel = 'TW';
-                          } else if (bonus === 'DW') {
-                            cellBg = 'bg-[#fda4af] border border-[#fecdd3] text-[#881337]';
-                            cellLabel = 'DW';
-                          } else if (bonus === 'TL') {
-                            cellBg = 'bg-[#2563eb] border border-[#93c5fd] text-white';
-                            cellLabel = 'TL';
-                          } else if (bonus === 'DL') {
-                            cellBg = 'bg-[#7dd3fc] border border-[#bae6fd] text-[#0c4a6e]';
-                            cellLabel = 'DL';
-                          } else if (bonus === 'star') {
-                            cellBg = 'bg-[#fda4af] border border-[#fecdd3] text-[#881337]';
-                            cellLabel = '★';
-                          }
+                        if (!bonus) {
+                          cellStyle = { backgroundColor: isDark ? '#262a33' : '#f8fafc', borderColor: isDark ? '#323743' : '#cbd5e1', color: isDark ? '#94a3b8' : '#94a3b8' };
+                        } else if (bonus === 'TW') {
+                          cellStyle = { backgroundColor: customColors.twTile, borderColor: isDark ? '#8f3636' : '#fda4af', color: isDark ? '#e2b4b4' : '#fff' };
+                          cellLabel = 'TW';
+                        } else if (bonus === 'DW') {
+                          cellStyle = { backgroundColor: customColors.dwTile, borderColor: isDark ? '#a85b5b' : '#fecdd3', color: isDark ? '#eed3d3' : '#881337' };
+                          cellLabel = 'DW';
+                        } else if (bonus === 'TL') {
+                          cellStyle = { backgroundColor: isDark ? '#162d4c' : '#2563eb', borderColor: isDark ? '#203c62' : '#93c5fd', color: isDark ? '#a8c0e0' : '#fff' };
+                          cellLabel = 'TL';
+                        } else if (bonus === 'DL') {
+                          cellStyle = { backgroundColor: customColors.dlTile, borderColor: isDark ? '#335372' : '#bae6fd', color: isDark ? '#bcd5eb' : '#0c4a6e' };
+                          cellLabel = 'DL';
+                        } else if (bonus === 'star') {
+                          cellStyle = { backgroundColor: customColors.dwTile, borderColor: isDark ? '#a85b5b' : '#fecdd3', color: isDark ? '#eed3d3' : '#881337' };
+                          cellLabel = '★';
                         }
 
                         return (
@@ -2740,17 +2719,22 @@ export default function App() {
                                 placeTileOnBoard(r, c);
                               }
                             }}
-                            className={`rounded-md cursor-pointer flex flex-col items-center justify-center relative transition transform duration-150 shadow-sm ${cellBg}`}
-                            style={{ width: `${cellSize}px`, height: `${cellSize}px` }}
+                            className={cellClassName}
+                            style={{ width: `${cellSize}px`, height: `${cellSize}px`, ...cellStyle }}
                           >
                             {/* Render permanent tile */}
                             {permTile && (
                               <div 
-                                className="absolute inset-0 bg-[#d7be8a] border border-[#bfa573] rounded-sm text-[#2d2008] flex flex-col items-center justify-center font-extrabold shadow scale-[0.96]"
-                                style={{ fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif' }}
+                                className="absolute inset-0 rounded-sm flex flex-col items-center justify-center font-extrabold shadow scale-[0.96]"
+                                style={{
+                                  fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
+                                  backgroundColor: permTile.isBlank ? customColors.blankTile : customColors.scrTileBg,
+                                  color: customColors.scrTileText,
+                                  borderWidth: '1px', borderStyle: 'solid', borderColor: isDark ? '#bfa573' : '#bfa573'
+                                }}
                               >
                                 <span className={`leading-none ${permTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.55}px` }}>{permTile.letter}</span>
-                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.24}px`, bottom: `${cellSize * 0.06}px`, right: `${cellSize * 0.06}px` }}>{permTile.score}</span>
+                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.24}px`, bottom: `${cellSize * 0.06}px`, right: `${cellSize * 0.06}px`, color: customColors.scrTileText }}>{permTile.score}</span>
                                 {permTile.isBlank && <span className="absolute bg-amber-500 rounded-full ring-1 ring-white/30" style={{ top: `${cellSize * 0.06}px`, right: `${cellSize * 0.06}px`, width: `${cellSize * 0.14}px`, height: `${cellSize * 0.14}px` }} title="Blank representation" />}
                               </div>
                             )}
@@ -2758,8 +2742,12 @@ export default function App() {
                             {/* Render tentative tile */}
                             {tempTile && (
                               <div 
-                                className="absolute inset-0 bg-[#e3cb98] border-2 border-amber-500 rounded-sm text-[#2d2008] flex flex-col items-center justify-center font-extrabold shadow scale-[0.96] ring-1 ring-[#4f5666]"
-                                style={{ fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif' }}
+                                className="absolute inset-0 border-2 border-amber-500 rounded-sm flex flex-col items-center justify-center font-extrabold shadow scale-[0.96] ring-1 ring-[#4f5666]"
+                                style={{
+                                  fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
+                                  backgroundColor: tempTile.isBlank ? customColors.blankTile : customColors.scrTileBg,
+                                  color: customColors.scrTileText
+                                }}
                               >
                                 <span className={`leading-none ${tempTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.55}px` }}>{tempTile.letter}</span>
                                 <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.24}px`, bottom: `${cellSize * 0.06}px`, right: `${cellSize * 0.06}px` }}>{tempTile.score}</span>
@@ -2819,23 +2807,42 @@ export default function App() {
                         // Check if tile is tentatively placed on the board right now
                         const isPlaced = Object.values(tentativePlaced).some(t => t.id === tile.id);
                         const isSelectedExchange = selectedExchangeIds.includes(tile.id);
+                        const isSelected = selectedRackTile === idx;
 
                         return (
                           <button
                             key={tile.id}
                             disabled={isPlaced && !exchangeMode}
-                            onClick={() => selectRackTile(idx)}
-                            style={{ fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif' }}
-                            className={`w-full min-w-0 flex-1 shrink rounded-sm flex flex-col items-center justify-center relative font-extrabold shadow transition transform active:scale-95 ${maxTileWidthClass} aspect-[5/6] ${
-                              isPlaced
-                                ? isDark
-                                  ? 'opacity-20 cursor-not-allowed bg-[#1f232b] border-2 border-dashed border-[#2a2e37]'
-                                  : 'opacity-20 cursor-not-allowed bg-slate-200 border-2 border-dashed border-slate-350'
+                            onPointerDown={() => selectRackTile(idx)}
+                            style={{
+                              fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
+                              willChange: 'transform',
+                              transform: isSelected ? 'translateY(-8px)' : 'translateY(0)',
+                              transition: 'transform 80ms ease-out, box-shadow 80ms ease-out',
+                              backgroundColor: isPlaced
+                                ? isDark ? '#1f232b' : '#e2e8f0'
                                 : isSelectedExchange
-                                  ? 'bg-[#782b2b] border-2 border-[#8f3636] text-white scale-105'
-                                  : selectedRackTile === idx
-                                    ? 'bg-[#e3cb98] border-2 border-amber-500 text-[#2d2008] -translate-y-2 ring-4 ring-amber-500/30'
-                                    : 'bg-[#d7be8a] text-[#2d2008] border-2 border-[#bfa573] hover:bg-[#e3cb98]'
+                                  ? '#782b2b'
+                                  : customColors.scrTileBg,
+                              color: isPlaced
+                                ? 'transparent'
+                                : isSelectedExchange
+                                  ? '#fff'
+                                  : customColors.scrTileText,
+                              boxShadow: isSelected ? '0 6px 16px rgba(0,0,0,0.35), 0 0 0 3px rgba(245,158,11,0.4)' : undefined,
+                              borderWidth: '2px',
+                              borderStyle: isPlaced ? 'dashed' : 'solid',
+                              borderColor: isPlaced
+                                ? isDark ? '#2a2e37' : '#cbd5e1'
+                                : isSelectedExchange
+                                  ? '#8f3636'
+                                  : isSelected
+                                    ? '#f59e0b'
+                                    : isDark ? '#bfa573' : '#bfa573',
+                              opacity: isPlaced ? 0.25 : 1,
+                            }}
+                            className={`w-full min-w-0 flex-1 shrink rounded-sm flex flex-col items-center justify-center relative font-extrabold shadow active:scale-95 ${maxTileWidthClass} aspect-[5/6] ${
+                              isPlaced ? 'cursor-not-allowed' : 'cursor-pointer'
                             }`}
                           >
                             <span className={`${letterSizeClass} leading-none font-extrabold`}>{tile.letter === '_' ? '' : tile.letter}</span>
