@@ -1898,6 +1898,10 @@ export default function App() {
     return a.localeCompare(b);
   });
 
+  // Turn Timer & Auto-Pass Logic
+  const [remainingTime, setRemainingTime] = useState(0);
+  const lastPassedTurnIndexRef = useRef(-1);
+
   // Flash red warning when timer hits 10 seconds
   const [shouldFlashRed, setShouldFlashRed] = useState(false);
   useEffect(() => {
@@ -1909,10 +1913,6 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [remainingTime, coloursEnabled]);
-
-  // Turn Timer & Auto-Pass Logic
-  const [remainingTime, setRemainingTime] = useState(0);
-  const lastPassedTurnIndexRef = useRef(-1);
 
   useEffect(() => {
     if (!roomData || roomData.status !== 'playing' || !roomData.timerEnabled) return;
