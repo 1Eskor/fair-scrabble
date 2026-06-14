@@ -1379,8 +1379,142 @@ export default function App() {
     }
   };
 
+  // Helper to submit valid tile placements or pass turn when timer runs out
+  const handleAutoPlayOrPass = async () => {
+    if (!roomData || !roomId || roomData.activePlayerId !== user.uid) return;
+
+    // Check if there are any tiles on the board
+    const placedCount = Object.keys(tentativePlaced).length;
+    if (placedCount > 0) {
+      const scoreData = getFormedWordsAndScores();
+      if (!scoreData.error && scoreData.words && scoreData.words.length > 0) {
+        // Valid play exists! Let's submit it.
+        setError('');
+        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
+        const updatedBoard = { ...roomData.board };
+        const myPlayer = roomData.players[user.uid];
+        if (myPlayer) {
+          const myRack = [...myPlayer.rack];
+          const myDeck = [...myPlayer.deck];
+
+          // Build lists of letters placed to remove from rack
+          const placedTileIds = Object.values(tentativePlaced).map(t => t.id);
+          const updatedRack = myRack.filter(tile => !placedTileIds.includes(tile.id));
+
+          // Place on perm board
+          Object.entries(tentativePlaced).forEach(([key, tile]) => {
+            updatedBoard[key] = {
+              letter: tile.letter,
+              score: tile.isBlank ? 0 : tile.score,
+              isBlank: !!tile.isBlank,
+              placedBy: user.uid,
+              turnIndex: roomData.turnIndex
+            };
+          });
+
+          // Refill rack from player's private balanced deck
+          const needed = roomData.rackSize - updatedRack.length;
+          for (let i = 0; i < needed; i++) {
+            if (myDeck.length > 0) {
+              updatedRack.push(myDeck.shift());
+            }
+          }
+
+          // Toggle turn cyclically
+          const currentIndex = roomData.playerOrder.indexOf(user.uid);
+          const nextPlayerId = roomData.playerOrder[(currentIndex + 1) % roomData.playerOrder.length] || user.uid;
+          const turnPoints = scoreData.totalScore;
+          const finalScore = (myPlayer.score || 0) + turnPoints;
+
+          // Fetch definitions for history asynchronously
+          const wordsWithDefs = await Promise.all(scoreData.words.map(async (w) => {
+            let validWord = w.forwardWord;
+            if (!checkWordLocal(w.forwardWord) && (roomData.backwardsAllowed || roomData.diagonalBackwardsAllowed) && checkWordLocal(w.backwardWord)) {
+              validWord = w.backwardWord;
+            }
+            const def = await fetchWordDefinition(validWord);
+            if (def) {
+              return `"${validWord}" (${w.score} pts): ${def}`;
+            }
+            return `"${validWord}" (${w.score} pts)`;
+          }));
+          const wordsPlacedStr = wordsWithDefs.join(' | ');
+
+          const bingoMsg = scoreData.bingoBonus > 0 ? ` BINGO (+${scoreData.bingoBonus} pts)!` : '';
+          const turnMessage = `${myPlayer.name} played ${wordsPlacedStr} for a total of ${turnPoints} pts.${bingoMsg}`;
+
+          const updatedPlayers = { ...roomData.players };
+          updatedPlayers[user.uid] = {
+            ...myPlayer,
+            score: finalScore,
+            rack: updatedRack,
+            deck: myDeck
+          };
+
+          // Prepare History action (structured for scorecard)
+          const historyItem = {
+            id: Math.random().toString(),
+            timestamp: Date.now(),
+            type: 'turn',
+            message: turnMessage,
+            playerName: myPlayer.name,
+            playerUid: user.uid,
+            words: scoreData.words.map(w => ({ word: w.forwardWord, score: w.score })),
+            points: turnPoints
+          };
+
+          const isGameOver = updatedRack.length === 0 && myDeck.length === 0;
+
+          let finalUpdateObj = {
+            board: updatedBoard,
+            players: updatedPlayers,
+            activePlayerId: nextPlayerId,
+            turnStartTime: Date.now(),
+            history: [...roomData.history, historyItem],
+            turnIndex: roomData.turnIndex + 1,
+            consecutiveZeroTurns: 0
+          };
+
+          if (isGameOver) {
+            const { players: finalPlayers, detailsStr, scorecardStr } = calculateEndgame(updatedPlayers, user.uid, true, [...roomData.history, historyItem]);
+            finalUpdateObj.players = finalPlayers;
+            finalUpdateObj.status = 'finished';
+            finalUpdateObj.history.push({
+              id: Math.random().toString(),
+              timestamp: Date.now() + 1,
+              type: 'system',
+              message: `GAME OVER! ${myPlayer.name} used their last tile. ${detailsStr}`
+            });
+            if (scorecardStr) {
+              finalUpdateObj.history.push({
+                id: Math.random().toString(),
+                timestamp: Date.now() + 2,
+                type: 'scorecard',
+                message: scorecardStr
+              });
+            }
+          }
+
+          try {
+            await updateDoc(roomRef, finalUpdateObj);
+            // Clear local placements
+            setTentativePlaced({});
+            setSelectedRackTile(null);
+            showTemporarySuccess("Time up! Auto-played tiles on the board.");
+            return;
+          } catch (err) {
+            console.error("Auto-play submission failed: ", err);
+          }
+        }
+      }
+    }
+
+    // If we didn't play (or it failed), pass the turn!
+    await handlePassTurn(true);
+  };
+
   // Skip turn action
-  const handlePassTurn = async () => {
+  const handlePassTurn = async (isTimeout = false) => {
     if (!roomData || !roomId || roomData.activePlayerId !== user.uid) return;
     setError('');
 
@@ -1393,7 +1527,9 @@ export default function App() {
       id: Math.random().toString(),
       timestamp: Date.now(),
       type: 'pass',
-      message: `${myPlayer.name} passed their turn.`,
+      message: isTimeout 
+        ? `${myPlayer.name} passed their turn (timer expired).` 
+        : `${myPlayer.name} passed their turn.`,
       playerName: myPlayer.name,
       playerUid: user.uid
     };
@@ -1452,7 +1588,7 @@ export default function App() {
       id: Math.random().toString(),
       timestamp: Date.now(),
       type: 'pass',
-      message: `${targetPlayer.name} passed their turn (timer expired / disconnected).`,
+      message: `${targetPlayer.name} passed their turn (timer expired).`,
       playerName: targetPlayer.name,
       playerUid: targetPlayerId
     };
@@ -1697,13 +1833,13 @@ export default function App() {
         if (roomData.activePlayerId === user?.uid) {
           if (lastPassedTurnIndexRef.current !== roomData.turnIndex) {
             lastPassedTurnIndexRef.current = roomData.turnIndex;
-            handlePassTurn();
+            handleAutoPlayOrPass();
           }
         } else {
-          // If it is NOT my turn, check if the active player is disconnected (inactive for 15s)
-          const activePlayer = roomData.players[roomData.activePlayerId];
-          const isDisconnected = !activePlayer || !activePlayer.lastActive || (Date.now() - activePlayer.lastActive > 15000);
-          if (isDisconnected) {
+          // If it is NOT my turn, wait for a 1.5-second grace period
+          // to let the active player's client handle its timeout first.
+          const actualPassed = (Date.now() - start) / 1000;
+          if (actualPassed >= roomData.timerDuration + 1.5) {
             // Find connected standby players who are not the active player
             const connectedNonActive = roomData.playerOrder.filter(uid => {
               if (uid === roomData.activePlayerId) return false;
