@@ -2742,7 +2742,7 @@ export default function App() {
                     {exchangeMode ? "Select Tiles to Exchange" : "Your Tile Rack"}
                   </span>
 
-                  <div className={`flex items-center justify-center gap-1.5 sm:gap-2 md:gap-2.5 px-0 py-1.5 sm:py-2 md:py-3 rounded-md border shadow-inner w-full overflow-x-hidden transition-colors ${
+                  <div className={`flex items-center justify-center gap-1.5 sm:gap-2 md:gap-2.5 px-0 py-3.5 sm:py-4 md:py-4.5 rounded-md border shadow-inner w-full overflow-x-hidden transition-colors ${
                     isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-100 border-slate-200'
                   }`}>
                     {(() => {
@@ -2779,13 +2779,13 @@ export default function App() {
                             className={`w-full min-w-0 flex-1 shrink rounded-sm flex flex-col items-center justify-center relative font-extrabold shadow transition transform active:scale-95 ${maxTileWidthClass} aspect-[5/6] ${
                               isPlaced
                                 ? isDark
-                                  ? 'opacity-20 cursor-not-allowed bg-[#1f232b] border border-dashed border-[#2a2e37]'
-                                  : 'opacity-20 cursor-not-allowed bg-slate-200 border border-dashed border-slate-350'
+                                  ? 'opacity-20 cursor-not-allowed bg-[#1f232b] border-2 border-dashed border-[#2a2e37]'
+                                  : 'opacity-20 cursor-not-allowed bg-slate-200 border-2 border-dashed border-slate-350'
                                 : isSelectedExchange
                                   ? 'bg-[#782b2b] border-2 border-[#8f3636] text-white scale-105'
                                   : selectedRackTile === idx
                                     ? 'bg-[#e3cb98] border-2 border-amber-500 text-[#2d2008] -translate-y-2 ring-4 ring-amber-500/30'
-                                    : 'bg-[#d7be8a] text-[#2d2008] border border-[#bfa573] hover:bg-[#e3cb98]'
+                                    : 'bg-[#d7be8a] text-[#2d2008] border-2 border-[#bfa573] hover:bg-[#e3cb98]'
                             }`}
                           >
                             <span className={`${letterSizeClass} leading-none font-extrabold`}>{tile.letter === '_' ? '' : tile.letter}</span>
