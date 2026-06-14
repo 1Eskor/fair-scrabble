@@ -270,6 +270,24 @@ export default function App() {
   const [exchangeMode, setExchangeMode] = useState(false);
   const [selectedExchangeIds, setSelectedExchangeIds] = useState([]);
 
+  // Customization State
+  const [showCustomizationPage, setShowCustomizationPage] = useState(false);
+  const DEFAULT_COLORS = {
+    boardBg: '#1a1d23',
+    blankTile: '#f8fafc',
+    dlTile: '#7dd3fc',
+    dwTile: '#fda4af',
+    twTile: '#f43f5e',
+    scrTileBg: '#d7be8a',
+    scrTileText: '#2d2008',
+  };
+  const [customColors, setCustomColors] = useState(() => {
+    try {
+      const stored = localStorage.getItem('scrabble_custom_colors');
+      return stored ? { ...DEFAULT_COLORS, ...JSON.parse(stored) } : DEFAULT_COLORS;
+    } catch { return DEFAULT_COLORS; }
+  });
+
   // Custom Dictionary Tool state
   const [dictWord, setDictWord] = useState('');
   const [dictResult, setDictResult] = useState(null);
@@ -297,6 +315,20 @@ export default function App() {
     };
     loadDict();
   }, []);
+
+  // Apply saved custom colors on mount
+  useEffect(() => {
+    const apply = (colors) => {
+      document.documentElement.style.setProperty('--cust-board-bg', colors.boardBg || '#1a1d23');
+      document.documentElement.style.setProperty('--cust-blank-tile', colors.blankTile || '#f8fafc');
+      document.documentElement.style.setProperty('--cust-dl-tile', colors.dlTile || '#7dd3fc');
+      document.documentElement.style.setProperty('--cust-dw-tile', colors.dwTile || '#fda4af');
+      document.documentElement.style.setProperty('--cust-tw-tile', colors.twTile || '#f43f5e');
+      document.documentElement.style.setProperty('--cust-scr-tile-bg', colors.scrTileBg || '#d7be8a');
+      document.documentElement.style.setProperty('--cust-scr-tile-text', colors.scrTileText || '#2d2008');
+    };
+    apply(customColors);
+  }, [customColors]);
 
   // --- SIGN IN AND RUN AUTH (RULE 3) ---
   useEffect(() => {
@@ -3291,7 +3323,21 @@ export default function App() {
               <div className={`border p-4 rounded-2xl text-xs space-y-2 transition-colors ${
                 isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
               }`}>
-                <h4 className={`font-bold uppercase tracking-widest mb-1.5 transition-colors ${isDark ? 'text-slate-400' : 'text-slate-505'}`}>Game Settings</h4>
+                <div className="flex items-center justify-between mb-1.5">
+                  <h4 className={`font-bold uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400' : 'text-slate-505'}`}>Game Settings</h4>
+                  <button
+                    title="Customize Board & Tiles"
+                    onClick={() => setShowCustomizationPage(true)}
+                    className={`p-1.5 rounded-lg transition ${
+                      isDark ? 'hover:bg-slate-700 text-slate-400 hover:text-slate-200' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-700'
+                    }`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+                </div>
                 <div className="grid grid-cols-2 gap-2 text-slate-350">
                   <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
                     <span className="text-slate-550 block">Grid Size:</span>
@@ -3318,6 +3364,144 @@ export default function App() {
         )}
 
       </main>
+
+      {/* --- CUSTOMIZATION FULL-SCREEN OVERLAY --- */}
+      {showCustomizationPage && (
+        <div className={`fixed inset-0 z-50 flex flex-col overflow-auto transition-colors ${
+          isDark ? 'bg-[#0e1014]' : 'bg-slate-50'
+        }`}>
+          {/* Header */}
+          <div className={`flex items-center justify-between px-5 py-4 border-b transition-colors ${
+            isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+          }`}>
+            <h2 className={`text-base font-extrabold uppercase tracking-widest ${
+              isDark ? 'text-slate-200' : 'text-slate-800'
+            }`}>🎨 Customize Board &amp; Tiles</h2>
+            <button
+              onClick={() => setShowCustomizationPage(false)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition border ${
+                isDark ? 'bg-slate-700 hover:bg-slate-600 border-slate-600 text-white' : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-800'
+              }`}
+            >
+              ← Back to Game
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 p-5 space-y-6 max-w-lg mx-auto w-full">
+
+            {/* Board Colors */}
+            <div className={`border rounded-2xl p-4 space-y-3 ${
+              isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+            }`}>
+              <h3 className={`text-xs font-bold uppercase tracking-widest ${
+                isDark ? 'text-slate-400' : 'text-slate-500'
+              }`}>Board</h3>
+              {[
+                { label: 'Background', key: 'boardBg' },
+                { label: 'Double Letter (DL)', key: 'dlTile' },
+                { label: 'Double Word / Center (DW ★)', key: 'dwTile' },
+                { label: 'Triple Word (TW)', key: 'twTile' },
+              ].map(({ label, key }) => (
+                <div key={key} className="flex items-center justify-between gap-3">
+                  <label className={`text-sm flex-1 ${
+                    isDark ? 'text-slate-300' : 'text-slate-700'
+                  }`}>{label}</label>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded border border-slate-400" style={{ backgroundColor: customColors[key] }} />
+                    <input
+                      type="color"
+                      value={customColors[key] || '#ffffff'}
+                      onChange={e => {
+                        const next = { ...customColors, [key]: e.target.value };
+                        setCustomColors(next);
+                        localStorage.setItem('scrabble_custom_colors', JSON.stringify(next));
+                      }}
+                      className="w-9 h-9 rounded cursor-pointer border-0 bg-transparent"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Scrabble Tile Colors */}
+            <div className={`border rounded-2xl p-4 space-y-3 ${
+              isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+            }`}>
+              <h3 className={`text-xs font-bold uppercase tracking-widest ${
+                isDark ? 'text-slate-400' : 'text-slate-500'
+              }`}>Scrabble Tiles</h3>
+              {[
+                { label: 'Tile Background', key: 'scrTileBg' },
+                { label: 'Tile Letter / Text', key: 'scrTileText' },
+                { label: 'Blank Tile', key: 'blankTile' },
+              ].map(({ label, key }) => (
+                <div key={key} className="flex items-center justify-between gap-3">
+                  <label className={`text-sm flex-1 ${
+                    isDark ? 'text-slate-300' : 'text-slate-700'
+                  }`}>{label}</label>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded border border-slate-400" style={{ backgroundColor: customColors[key] }} />
+                    <input
+                      type="color"
+                      value={customColors[key] || '#ffffff'}
+                      onChange={e => {
+                        const next = { ...customColors, [key]: e.target.value };
+                        setCustomColors(next);
+                        localStorage.setItem('scrabble_custom_colors', JSON.stringify(next));
+                      }}
+                      className="w-9 h-9 rounded cursor-pointer border-0 bg-transparent"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Preview */}
+            <div className={`border rounded-2xl p-4 ${
+              isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+            }`}>
+              <h3 className={`text-xs font-bold uppercase tracking-widest mb-3 ${
+                isDark ? 'text-slate-400' : 'text-slate-500'
+              }`}>Preview</h3>
+              <div className="flex gap-2 flex-wrap">
+                {/* Board squares */}
+                {[
+                  { bg: customColors.boardBg, label: 'BG' },
+                  { bg: customColors.dlTile, label: 'DL' },
+                  { bg: customColors.dwTile, label: 'DW' },
+                  { bg: customColors.twTile, label: 'TW' },
+                ].map(({ bg, label }) => (
+                  <div key={label} className="w-10 h-10 rounded-md flex items-center justify-center text-[10px] font-black border border-black/10 shadow-sm" style={{ backgroundColor: bg, color: bg }}>
+                    <span style={{ color: isDark ? '#fff' : '#000', mixBlendMode: 'difference' }}>{label}</span>
+                  </div>
+                ))}
+                {/* Scrabble tile */}
+                <div className="w-10 h-10 rounded-md flex flex-col items-center justify-center text-[16px] font-extrabold border border-black/20 shadow relative" style={{ backgroundColor: customColors.scrTileBg, color: customColors.scrTileText }}>
+                  A
+                  <span className="absolute bottom-0.5 right-0.5 text-[8px] font-bold" style={{ color: customColors.scrTileText }}>1</span>
+                </div>
+                <div className="w-10 h-10 rounded-md flex flex-col items-center justify-center font-extrabold border border-black/20 shadow" style={{ backgroundColor: customColors.blankTile }}>
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                </div>
+              </div>
+            </div>
+
+            {/* Reset */}
+            <button
+              onClick={() => {
+                setCustomColors(DEFAULT_COLORS);
+                localStorage.removeItem('scrabble_custom_colors');
+              }}
+              className={`w-full py-2.5 rounded-xl text-xs font-bold transition border ${
+                isDark ? 'bg-slate-700 hover:bg-slate-600 border-slate-600 text-white' : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-800'
+              }`}
+            >
+              Reset to Defaults
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* --- BLANK TILE CHARACTER SELECT MODAL --- */}
       {blankModalOpen && (
