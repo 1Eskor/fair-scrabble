@@ -274,13 +274,15 @@ export default function App() {
   const [showCustomizationPage, setShowCustomizationPage] = useState(false);
   const DEFAULT_COLORS = {
     boardBg: '#f2f2f2',
-    blankTile: '#f8fafc',
+    boardTile: '#f8fafc',
     dlTile: '#7dd3fc',
     dlText: '#0c4a6e',
     dwTile: '#fda4af',
     dwText: '#881337',
     twTile: '#f43f5e',
     twText: '#ffffff',
+    tlTile: '#2563eb',
+    tlText: '#ffffff',
     scrTileBg: '#d7be8a',
     scrTileText: '#2d2008',
   };
@@ -2692,7 +2694,7 @@ export default function App() {
                         let cellClassName = 'rounded-md cursor-pointer flex flex-col items-center justify-center relative transition duration-150 shadow-sm border';
 
                         if (!bonus) {
-                          cellStyle = { backgroundColor: isDark ? '#262a33' : '#f8fafc', borderColor: isDark ? '#323743' : '#cbd5e1', color: isDark ? '#94a3b8' : '#94a3b8' };
+                          cellStyle = { backgroundColor: customColors.boardTile || '#f8fafc', borderColor: isDark ? '#323743' : '#cbd5e1', color: isDark ? '#94a3b8' : '#94a3b8' };
                         } else if (bonus === 'TW') {
                           cellStyle = { backgroundColor: customColors.twTile, borderColor: isDark ? '#8f3636' : '#fda4af', color: customColors.twText || '#ffffff' };
                           cellLabel = 'TW';
@@ -2700,7 +2702,7 @@ export default function App() {
                           cellStyle = { backgroundColor: customColors.dwTile, borderColor: isDark ? '#a85b5b' : '#fecdd3', color: customColors.dwText || '#881337' };
                           cellLabel = 'DW';
                         } else if (bonus === 'TL') {
-                          cellStyle = { backgroundColor: isDark ? '#162d4c' : '#2563eb', borderColor: isDark ? '#203c62' : '#93c5fd', color: isDark ? '#a8c0e0' : '#fff' };
+                          cellStyle = { backgroundColor: customColors.tlTile || '#2563eb', borderColor: isDark ? '#203c62' : '#93c5fd', color: customColors.tlText || '#ffffff' };
                           cellLabel = 'TL';
                         } else if (bonus === 'DL') {
                           cellStyle = { backgroundColor: customColors.dlTile, borderColor: isDark ? '#335372' : '#bae6fd', color: customColors.dlText || '#0c4a6e' };
@@ -2729,7 +2731,7 @@ export default function App() {
                                 className="absolute inset-0 rounded-sm flex flex-col items-center justify-center font-extrabold shadow scale-[0.96]"
                                 style={{
                                   fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
-                                  backgroundColor: permTile.isBlank ? customColors.blankTile : customColors.scrTileBg,
+                                  backgroundColor: customColors.scrTileBg,
                                   color: customColors.scrTileText,
                                   borderWidth: '1px', borderStyle: 'solid', borderColor: isDark ? '#bfa573' : '#bfa573'
                                 }}
@@ -2746,7 +2748,7 @@ export default function App() {
                                 className="absolute inset-0 border-2 border-amber-500 rounded-sm flex flex-col items-center justify-center font-extrabold shadow scale-[0.96] ring-1 ring-[#4f5666]"
                                 style={{
                                   fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
-                                  backgroundColor: tempTile.isBlank ? customColors.blankTile : customColors.scrTileBg,
+                                  backgroundColor: customColors.scrTileBg,
                                   color: customColors.scrTileText
                                 }}
                               >
@@ -2824,7 +2826,7 @@ export default function App() {
                                 ? isDark ? '#1f232b' : '#e2e8f0'
                                 : isSelectedExchange
                                   ? '#782b2b'
-                                  : tile.letter === '_' ? customColors.blankTile : customColors.scrTileBg,
+                                  : customColors.scrTileBg,
                               color: isPlaced
                                 ? 'transparent'
                                 : isSelectedExchange
@@ -3407,12 +3409,15 @@ export default function App() {
               }`}>Board</h3>
               {[
                 { label: 'Grid Gap / Background', key: 'boardBg' },
+                { label: 'Board Tiles (empty squares)', key: 'boardTile' },
                 { label: 'DL — Fill', key: 'dlTile' },
                 { label: 'DL — Text', key: 'dlText' },
                 { label: 'DW / Center — Fill', key: 'dwTile' },
                 { label: 'DW / Center — Text', key: 'dwText' },
                 { label: 'TW — Fill', key: 'twTile' },
                 { label: 'TW — Text', key: 'twText' },
+                { label: 'TL — Fill', key: 'tlTile' },
+                { label: 'TL — Text', key: 'tlText' },
               ].map(({ label, key }) => (
                 <div key={key} className="flex items-center justify-between gap-3">
                   <label className={`text-sm flex-1 ${
@@ -3445,7 +3450,6 @@ export default function App() {
               {[
                 { label: 'Tile Background', key: 'scrTileBg' },
                 { label: 'Tile Letter / Text', key: 'scrTileText' },
-                { label: 'Blank Tile', key: 'blankTile' },
               ].map(({ label, key }) => (
                 <div key={key} className="flex items-center justify-between gap-3">
                   <label className={`text-sm flex-1 ${
@@ -3476,18 +3480,16 @@ export default function App() {
                 isDark ? 'text-slate-400' : 'text-slate-500'
               }`}>Preview</h3>
               <div className="flex gap-2 flex-wrap">
-                {/* Board squares */}
                 <div className="w-10 h-10 rounded-md border border-black/10 shadow-sm" style={{ backgroundColor: customColors.boardBg }} title="Grid Gap" />
+                <div className="w-10 h-10 rounded-md border border-black/10 shadow-sm flex items-center justify-center text-[9px] font-bold" style={{ backgroundColor: customColors.boardTile || '#f8fafc', color: '#94a3b8' }}>TILE</div>
                 <div className="w-10 h-10 rounded-md flex items-center justify-center text-[10px] font-black border border-black/10 shadow-sm" style={{ backgroundColor: customColors.dlTile, color: customColors.dlText || '#0c4a6e' }}>DL</div>
                 <div className="w-10 h-10 rounded-md flex items-center justify-center text-[10px] font-black border border-black/10 shadow-sm" style={{ backgroundColor: customColors.dwTile, color: customColors.dwText || '#881337' }}>DW</div>
                 <div className="w-10 h-10 rounded-md flex items-center justify-center text-[10px] font-black border border-black/10 shadow-sm" style={{ backgroundColor: customColors.twTile, color: customColors.twText || '#ffffff' }}>TW</div>
+                <div className="w-10 h-10 rounded-md flex items-center justify-center text-[10px] font-black border border-black/10 shadow-sm" style={{ backgroundColor: customColors.tlTile || '#2563eb', color: customColors.tlText || '#ffffff' }}>TL</div>
                 {/* Scrabble tile */}
                 <div className="w-10 h-10 rounded-md flex flex-col items-center justify-center text-[16px] font-extrabold border border-black/20 shadow relative" style={{ backgroundColor: customColors.scrTileBg, color: customColors.scrTileText }}>
                   A
                   <span className="absolute bottom-0.5 right-0.5 text-[8px] font-bold" style={{ color: customColors.scrTileText }}>1</span>
-                </div>
-                <div className="w-10 h-10 rounded-md flex flex-col items-center justify-center font-extrabold border border-black/20 shadow" style={{ backgroundColor: customColors.blankTile }}>
-                  <span className="w-2 h-2 rounded-full bg-amber-500" />
                 </div>
               </div>
             </div>
