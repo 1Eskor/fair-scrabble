@@ -300,6 +300,9 @@ export default function App() {
 
   const chatContainerRef = useRef(null);
   const prevChatLengthRef = useRef(0);
+  const boardContainerRef = useRef(null);
+  const lastTapRef = useRef(0);
+  const singleTapTimeoutRef = useRef(null);
 
   // SOWPODS Dictionary Loading
   const [dictLoaded, setDictLoaded] = useState(false);
@@ -701,6 +704,59 @@ export default function App() {
           console.error("Failed to update rearranged rack order:", e);
         }
       }
+    }
+  };
+
+  const handleBoardCellTap = (r, c) => {
+    if (!isMobile) {
+      if (tentativePlaced[`${r},${c}`]) {
+        removeTentativeTile(r, c);
+      } else {
+        placeTileOnBoard(r, c);
+      }
+      return;
+    }
+
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 250;
+
+    if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+      // Double tap detected
+      lastTapRef.current = 0;
+      if (singleTapTimeoutRef.current) {
+        clearTimeout(singleTapTimeoutRef.current);
+        singleTapTimeoutRef.current = null;
+      }
+
+      if (boardZoom > 1.2) {
+        setBoardZoom(1.0);
+      } else {
+        setBoardZoom(2.0);
+        setTimeout(() => {
+          if (boardContainerRef.current) {
+            const container = boardContainerRef.current;
+            const newCellSize = baseCellSize * 2.0;
+            const cellCenterX = c * newCellSize + newCellSize / 2;
+            const cellCenterY = r * newCellSize + newCellSize / 2;
+            const targetLeft = cellCenterX - container.clientWidth / 2;
+            const targetTop = cellCenterY - container.clientHeight / 2;
+            container.scrollTo({ left: Math.max(0, targetLeft), top: Math.max(0, targetTop), behavior: 'smooth' });
+          }
+        }, 50);
+      }
+    } else {
+      lastTapRef.current = now;
+      if (singleTapTimeoutRef.current) {
+        clearTimeout(singleTapTimeoutRef.current);
+      }
+      singleTapTimeoutRef.current = setTimeout(() => {
+        singleTapTimeoutRef.current = null;
+        if (tentativePlaced[`${r},${c}`]) {
+          removeTentativeTile(r, c);
+        } else {
+          placeTileOnBoard(r, c);
+        }
+      }, DOUBLE_TAP_DELAY);
     }
   };
 
@@ -2671,7 +2727,11 @@ export default function App() {
               </div>
 
               {/* Interactive Scrabble Board Display */}
-              <div className="w-full p-0 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-2xl overflow-auto flex border-0 md:border" style={{ backgroundColor: customColors.boardBg }}>
+              <div 
+                ref={boardContainerRef}
+                className="w-full p-0 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-2xl overflow-auto overscroll-none flex border-0 md:border touch-pan-x touch-pan-y" 
+                style={{ backgroundColor: customColors.boardBg }}
+              >
                 <div className="select-none p-0.5 md:p-2 rounded-lg md:rounded-xl border mx-auto" style={{ backgroundColor: customColors.boardBg, borderColor: isDark ? '#0f1114' : '#d1d5db' }}>
                   <div
                     className="grid"
@@ -2715,13 +2775,7 @@ export default function App() {
                         return (
                           <div
                             key={key}
-                            onClick={() => {
-                              if (tempTile) {
-                                removeTentativeTile(r, c);
-                              } else {
-                                placeTileOnBoard(r, c);
-                              }
-                            }}
+                            onClick={() => handleBoardCellTap(r, c)}
                             className={cellClassName}
                             style={{ width: `${cellSize}px`, height: `${cellSize}px`, ...cellStyle }}
                           >
