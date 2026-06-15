@@ -2861,16 +2861,17 @@ export default function App() {
                             {/* Render permanent tile */}
                             {permTile && (
                               <div 
-                                className="absolute inset-0 rounded-[4px] flex flex-col items-center justify-center font-extrabold shadow scale-100"
+                                className="absolute rounded-[4px] flex flex-col items-center justify-center font-extrabold shadow scale-100"
                                 style={{
+                                  top: '-1px', left: '-1px', right: '-1px', bottom: '-1px',
                                   fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
                                   backgroundColor: customColors.scrTileBg,
                                   color: customColors.scrTileText,
                                   borderWidth: '1px', borderStyle: 'solid', borderColor: isDark ? '#bfa573' : '#bfa573'
                                 }}
                               >
-                                <span className={`leading-none ${permTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.62}px`, transform: 'translate(-6%, -6%)' }}>{permTile.letter}</span>
-                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.20}px`, bottom: `${cellSize * 0.08}px`, right: `${cellSize * 0.08}px`, color: customColors.scrTileText }}>{permTile.score}</span>
+                                <span className={`leading-none ${permTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.62}px` }}>{permTile.letter}</span>
+                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.18}px`, bottom: `${cellSize * 0.03}px`, right: `${cellSize * 0.03}px`, color: customColors.scrTileText }}>{permTile.score}</span>
                                 {permTile.isBlank && <span className="absolute bg-amber-500 rounded-full ring-1 ring-white/30" style={{ top: `${cellSize * 0.08}px`, left: `${cellSize * 0.08}px`, width: `${cellSize * 0.14}px`, height: `${cellSize * 0.14}px` }} title="Blank representation" />}
                               </div>
                             )}
@@ -2878,15 +2879,16 @@ export default function App() {
                             {/* Render tentative tile */}
                             {tempTile && (
                               <div 
-                                className="absolute inset-0 border-2 border-amber-500 rounded-[4px] flex flex-col items-center justify-center font-extrabold shadow scale-100"
+                                className="absolute border-2 border-amber-500 rounded-[4px] flex flex-col items-center justify-center font-extrabold shadow scale-100"
                                 style={{
+                                  top: '-1px', left: '-1px', right: '-1px', bottom: '-1px',
                                   fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
                                   backgroundColor: customColors.scrTileBg,
                                   color: customColors.scrTileText
                                 }}
                               >
-                                <span className={`leading-none ${tempTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.62}px`, transform: 'translate(-6%, -6%)' }}>{tempTile.letter}</span>
-                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.20}px`, bottom: `${cellSize * 0.08}px`, right: `${cellSize * 0.08}px` }}>{tempTile.score}</span>
+                                <span className={`leading-none ${tempTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.62}px` }}>{tempTile.letter}</span>
+                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.18}px`, bottom: `${cellSize * 0.03}px`, right: `${cellSize * 0.03}px` }}>{tempTile.score}</span>
                                 {tempTile.isBlank && <span className="absolute bg-amber-500 rounded-full ring-1 ring-white/30" style={{ top: `${cellSize * 0.08}px`, left: `${cellSize * 0.08}px`, width: `${cellSize * 0.14}px`, height: `${cellSize * 0.14}px` }} />}
                               </div>
                             )}
