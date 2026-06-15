@@ -2830,7 +2830,7 @@ export default function App() {
                         // Layout styling for special squares — use customColors for TW/DW/DL, defaults for blank/TL
                         let cellLabel = '';
                         let cellStyle = {};
-                        let cellClassName = 'rounded-[2px] cursor-pointer flex flex-col items-center justify-center relative transition duration-150 shadow-sm border touch-manipulation';
+                        let cellClassName = 'rounded-[4px] cursor-pointer flex flex-col items-center justify-center relative transition duration-150 shadow-sm border touch-manipulation';
 
                         if (!bonus) {
                           cellStyle = { backgroundColor: customColors.boardTile || '#f8fafc', borderColor: isDark ? '#323743' : '#cbd5e1', color: isDark ? '#94a3b8' : '#94a3b8' };
@@ -2861,7 +2861,7 @@ export default function App() {
                             {/* Render permanent tile */}
                             {permTile && (
                               <div 
-                                className="absolute inset-0 rounded-[2px] flex flex-col items-center justify-center font-extrabold shadow scale-100"
+                                className="absolute inset-0 rounded-[4px] flex flex-col items-center justify-center font-extrabold shadow scale-100"
                                 style={{
                                   fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
                                   backgroundColor: customColors.scrTileBg,
@@ -2869,8 +2869,8 @@ export default function App() {
                                   borderWidth: '1px', borderStyle: 'solid', borderColor: isDark ? '#bfa573' : '#bfa573'
                                 }}
                               >
-                                <span className={`leading-none ${permTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.70}px` }}>{permTile.letter}</span>
-                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.22}px`, top: `${cellSize * 0.08}px`, right: `${cellSize * 0.08}px`, color: customColors.scrTileText }}>{permTile.score}</span>
+                                <span className={`leading-none ${permTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.62}px`, transform: 'translate(-6%, -6%)' }}>{permTile.letter}</span>
+                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.20}px`, bottom: `${cellSize * 0.08}px`, right: `${cellSize * 0.08}px`, color: customColors.scrTileText }}>{permTile.score}</span>
                                 {permTile.isBlank && <span className="absolute bg-amber-500 rounded-full ring-1 ring-white/30" style={{ top: `${cellSize * 0.08}px`, left: `${cellSize * 0.08}px`, width: `${cellSize * 0.14}px`, height: `${cellSize * 0.14}px` }} title="Blank representation" />}
                               </div>
                             )}
@@ -2878,15 +2878,15 @@ export default function App() {
                             {/* Render tentative tile */}
                             {tempTile && (
                               <div 
-                                className="absolute inset-0 border-2 border-amber-500 rounded-[2px] flex flex-col items-center justify-center font-extrabold shadow scale-100"
+                                className="absolute inset-0 border-2 border-amber-500 rounded-[4px] flex flex-col items-center justify-center font-extrabold shadow scale-100"
                                 style={{
                                   fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
                                   backgroundColor: customColors.scrTileBg,
                                   color: customColors.scrTileText
                                 }}
                               >
-                                <span className={`leading-none ${tempTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.70}px` }}>{tempTile.letter}</span>
-                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.22}px`, top: `${cellSize * 0.08}px`, right: `${cellSize * 0.08}px` }}>{tempTile.score}</span>
+                                <span className={`leading-none ${tempTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.62}px`, transform: 'translate(-6%, -6%)' }}>{tempTile.letter}</span>
+                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.20}px`, bottom: `${cellSize * 0.08}px`, right: `${cellSize * 0.08}px` }}>{tempTile.score}</span>
                                 {tempTile.isBlank && <span className="absolute bg-amber-500 rounded-full ring-1 ring-white/30" style={{ top: `${cellSize * 0.08}px`, left: `${cellSize * 0.08}px`, width: `${cellSize * 0.14}px`, height: `${cellSize * 0.14}px` }} />}
                               </div>
                             )}
@@ -3620,8 +3620,8 @@ export default function App() {
                 <div className="w-10 h-10 rounded-md flex items-center justify-center text-[10px] font-black border border-black/10 shadow-sm" style={{ backgroundColor: customColors.twTile, color: customColors.twText || '#ffffff' }}>TW</div>
                 <div className="w-10 h-10 rounded-md flex items-center justify-center text-[10px] font-black border border-black/10 shadow-sm" style={{ backgroundColor: customColors.tlTile || '#2563eb', color: customColors.tlText || '#ffffff' }}>TL</div>
                 {/* Scrabble tile */}
-                <div className="w-10 h-10 rounded-md flex flex-col items-center justify-center text-[16px] font-extrabold border border-black/20 shadow relative" style={{ backgroundColor: customColors.scrTileBg, color: customColors.scrTileText }}>
-                  A
+                <div className="w-10 h-10 rounded-[4px] flex flex-col items-center justify-center text-[16px] font-extrabold border border-black/20 shadow relative" style={{ backgroundColor: customColors.scrTileBg, color: customColors.scrTileText }}>
+                  <span style={{ transform: 'translate(-6%, -6%)' }}>A</span>
                   <span className="absolute bottom-0.5 right-0.5 text-[8px] font-bold" style={{ color: customColors.scrTileText }}>1</span>
                 </div>
               </div>
