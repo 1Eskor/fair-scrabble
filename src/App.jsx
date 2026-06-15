@@ -261,6 +261,7 @@ export default function App() {
 
   // Theme State ('dark' | 'light')
   const [theme, setTheme] = useState(() => localStorage.getItem('scrabble_theme') || 'dark');
+  const isDark = theme === 'dark';
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -2091,17 +2092,42 @@ export default function App() {
     handleAutoPlayOrPassRef.current = handleAutoPlayOrPass;
   });
 
-  // Flash red warning when timer hits 10 seconds
-  const [shouldFlashRed, setShouldFlashRed] = useState(false);
+  // Flash green at start of turn
+  const [shouldFlashGreen, setShouldFlashGreen] = useState(false);
+  const prevTurnIndexRef = useRef(-1);
+
   useEffect(() => {
-    if (coloursEnabled && remainingTime === 10) {
-      setShouldFlashRed(true);
+    if (!roomData || roomData.status !== 'playing') return;
+    
+    // Check if the turn has changed
+    if (prevTurnIndexRef.current !== roomData.turnIndex) {
+      prevTurnIndexRef.current = roomData.turnIndex;
+      
+      // Light up green for 5 seconds
+      setShouldFlashGreen(true);
       const timer = setTimeout(() => {
-        setShouldFlashRed(false);
-      }, 500);
+        setShouldFlashGreen(false);
+      }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [remainingTime, coloursEnabled]);
+  }, [roomData?.turnIndex, roomData?.status]);
+
+  const getBoxStyles = () => {
+    // 1. Green highlight (first 5 seconds of the turn)
+    if (coloursEnabled && shouldFlashGreen) {
+      return isDark ? 'bg-[#064e3b] border-[#059669]' : 'bg-[#e2fced] border-[#a7f3d0]';
+    }
+
+    // 2. Red warning (last 10 seconds of active player's turn)
+    const isWarning = roomData?.status === 'playing' && roomData.timerEnabled && remainingTime <= 10;
+    
+    if (coloursEnabled && isWarning) {
+      return isDark ? 'flash-red-dark border-transparent' : 'flash-red-light border-transparent';
+    }
+    
+    // 3. Normal styles
+    return isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200';
+  };
 
   useEffect(() => {
     if (!roomData || roomData.status !== 'playing' || !roomData.timerEnabled) return;
@@ -2178,14 +2204,28 @@ export default function App() {
 
 
 
-  const isDark = theme === 'dark';
-
   return (
     <div className={`min-h-screen font-sans flex flex-col antialiased transition-colors duration-200 ${
       isDark 
         ? 'bg-[#0e1013] text-[#e2e8f0] selection:bg-[#2a2e37] selection:text-slate-950' 
         : 'bg-[#f8fafc] text-[#1e293b] selection:bg-slate-200 selection:text-slate-900'
     }`}>
+      <style>{`
+        @keyframes flashRedDark {
+          0%, 100% { background-color: #15181d; border-color: #21252d; }
+          50% { background-color: #7f1d1d; border-color: #991b1b; }
+        }
+        @keyframes flashRedLight {
+          0%, 100% { background-color: #ffffff; border-color: #cbd5e1; }
+          50% { background-color: #fee2e2; border-color: #fca5a5; }
+        }
+        .flash-red-dark {
+          animation: flashRedDark 1s infinite;
+        }
+        .flash-red-light {
+          animation: flashRedLight 1s infinite;
+        }
+      `}</style>
 
       {/* --- HEADER --- */}
       <header className={`border-b shadow-xl py-4 px-6 z-30 transition-colors duration-200 ${
@@ -2195,7 +2235,7 @@ export default function App() {
 
           {/* Logo & Heading */}
           <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-[#e3cb98] to-[#d7be8a] border border-[#bfa573] text-[#2d2008] font-black text-2xl h-10 w-10 flex items-center justify-center rounded-lg shadow-md tracking-wider">
+            <div className="bg-gradient-to-br from-[#e3cb98] to-[#d7be8a] border border-[#d7be8a] text-[#2d2008] font-black text-2xl h-10 w-10 flex items-center justify-center rounded-lg shadow-md tracking-wider">
               S
             </div>
             <div>
@@ -2688,11 +2728,7 @@ export default function App() {
             <div className="lg:col-span-8 space-y-4 flex flex-col items-center">
 
               {/* Game Info Bar */}
-              <div className={`w-full p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl border transition-all duration-300 ${
-                shouldFlashRed
-                  ? isDark ? 'bg-[#7f1d1d] border-[#991b1b]' : 'bg-[#fee2e2] border-[#fca5a5]'
-                  : isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
-              }`}>
+              <div className={`w-full p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl border transition-all duration-300 ${getBoxStyles()}`}>
 
                 {/* Share Room Info */}
                 <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-colors ${
@@ -2867,7 +2903,7 @@ export default function App() {
                                   fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
                                   backgroundColor: customColors.scrTileBg,
                                   color: customColors.scrTileText,
-                                  borderWidth: '1px', borderStyle: 'solid', borderColor: isDark ? '#bfa573' : '#bfa573'
+                                  borderWidth: '1px', borderStyle: 'solid', borderColor: customColors.scrTileBg
                                 }}
                               >
                                 <span className={`leading-none ${permTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.62}px` }}>{permTile.letter}</span>
@@ -2879,12 +2915,13 @@ export default function App() {
                             {/* Render tentative tile */}
                             {tempTile && (
                               <div 
-                                className="absolute border-2 border-amber-500 rounded-[4px] flex flex-col items-center justify-center font-extrabold shadow scale-100"
+                                className="absolute rounded-[4px] flex flex-col items-center justify-center font-extrabold shadow scale-100"
                                 style={{
                                   top: '-1px', left: '-1px', right: '-1px', bottom: '-1px',
                                   fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
                                   backgroundColor: customColors.scrTileBg,
-                                  color: customColors.scrTileText
+                                  color: customColors.scrTileText,
+                                  borderWidth: '1px', borderStyle: 'solid', borderColor: customColors.scrTileBg
                                 }}
                               >
                                 <span className={`leading-none ${tempTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.62}px` }}>{tempTile.letter}</span>
@@ -2906,11 +2943,7 @@ export default function App() {
               </div>
 
               {/* Rack Controls Section */}
-              <div className={`w-full border px-0.5 py-4 sm:px-3 md:px-4 md:py-6 rounded-2xl shadow-xl space-y-4 transition-all duration-300 ${
-                shouldFlashRed
-                  ? isDark ? 'bg-[#7f1d1d] border-[#991b1b]' : 'bg-[#fee2e2] border-[#fca5a5]'
-                  : isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
-              }`}>
+              <div className={`w-full border px-0.5 py-4 sm:px-3 md:px-4 md:py-6 rounded-2xl shadow-xl space-y-4 transition-all duration-300 ${getBoxStyles()}`}>
 
                 {/* Rack Tiles */}
                 <div className="flex flex-col items-center gap-3">
@@ -2957,6 +2990,7 @@ export default function App() {
                               willChange: 'transform',
                               transform: isSelected ? 'translateY(-8px)' : 'translateY(0)',
                               transition: 'none',
+                              aspectRatio: '1 / 1',
                               backgroundColor: isPlaced
                                 ? isDark ? '#1f232b' : '#e2e8f0'
                                 : isSelectedExchange
@@ -2976,10 +3010,10 @@ export default function App() {
                                   ? '#8f3636'
                                   : isSelected
                                     ? '#f59e0b'
-                                    : isDark ? '#bfa573' : '#bfa573',
+                                    : customColors.scrTileBg,
                               opacity: isPlaced ? 0.25 : 1,
                             }}
-                            className={`w-full min-w-0 flex-1 shrink rounded-sm flex flex-col items-center justify-center relative font-extrabold shadow active:scale-95 ${maxTileWidthClass} aspect-[5/6] ${
+                            className={`w-full min-w-0 flex-1 shrink rounded-[4px] flex flex-col items-center justify-center relative font-extrabold shadow active:scale-95 p-0 ${maxTileWidthClass} aspect-square ${
                               isPlaced ? 'cursor-not-allowed' : 'cursor-pointer'
                             }`}
                           >
@@ -3622,7 +3656,7 @@ export default function App() {
                 <div className="w-10 h-10 rounded-md flex items-center justify-center text-[10px] font-black border border-black/10 shadow-sm" style={{ backgroundColor: customColors.twTile, color: customColors.twText || '#ffffff' }}>TW</div>
                 <div className="w-10 h-10 rounded-md flex items-center justify-center text-[10px] font-black border border-black/10 shadow-sm" style={{ backgroundColor: customColors.tlTile || '#2563eb', color: customColors.tlText || '#ffffff' }}>TL</div>
                 {/* Scrabble tile */}
-                <div className="w-10 h-10 rounded-[4px] flex flex-col items-center justify-center text-[16px] font-extrabold border border-black/20 shadow relative" style={{ backgroundColor: customColors.scrTileBg, color: customColors.scrTileText }}>
+                <div className="w-10 h-10 rounded-[4px] flex flex-col items-center justify-center text-[16px] font-extrabold border shadow relative" style={{ backgroundColor: customColors.scrTileBg, color: customColors.scrTileText, borderColor: customColors.scrTileBg }}>
                   <span style={{ transform: 'translate(-6%, -6%)' }}>A</span>
                   <span className="absolute bottom-0.5 right-0.5 text-[8px] font-bold" style={{ color: customColors.scrTileText }}>1</span>
                 </div>
