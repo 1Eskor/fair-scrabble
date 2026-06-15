@@ -324,7 +324,10 @@ export default function App() {
     loadDict();
   }, []);
 
-  // Custom drag-to-pan touch handler for 2D scrolling when zoomed in
+  // Custom drag-to-pan touch handler for 2D free scrolling when zoomed in.
+  // Key insight: touchstart MUST be non-passive so we can call e.preventDefault()
+  // immediately, preventing the browser from initiating its own axis-locking native
+  // scroll. Only then can touchmove freely drive both scroll axes simultaneously.
   useEffect(() => {
     const container = boardContainerRef.current;
     if (!container) return;
@@ -336,9 +339,11 @@ export default function App() {
     let startScrollTop = 0;
 
     const handleTouchStart = (e) => {
-      // Only drag if zoomed in and a single touch is used
       if (boardZoom <= 1.2) return;
       if (e.touches.length !== 1) return;
+
+      // CRITICAL: prevent browser from starting its axis-locking native scroll
+      e.preventDefault();
 
       isDragging = true;
       startX = e.touches[0].clientX;
@@ -351,35 +356,27 @@ export default function App() {
       if (!isDragging) return;
       if (e.touches.length !== 1) return;
 
-      const currentX = e.touches[0].clientX;
-      const currentY = e.touches[0].clientY;
+      e.preventDefault();
 
-      const deltaX = currentX - startX;
-      const deltaY = currentY - startY;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
 
-      // Scroll container programmatically
-      container.scrollLeft = startScrollLeft - deltaX;
-      container.scrollTop = startScrollTop - deltaY;
-
-      // Prevent native axis-locking scroll behavior
-      if (e.cancelable) {
-        e.preventDefault();
-      }
+      container.scrollLeft = startScrollLeft - dx;
+      container.scrollTop  = startScrollTop  - dy;
     };
 
-    const handleTouchEnd = () => {
-      isDragging = false;
-    };
+    const handleTouchEnd = () => { isDragging = false; };
 
-    container.addEventListener('touchstart', handleTouchStart, { passive: true });
-    container.addEventListener('touchmove', handleTouchMove, { passive: false });
-    container.addEventListener('touchend', handleTouchEnd, { passive: true });
-    container.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+    // Both must be { passive: false } so e.preventDefault() is allowed
+    container.addEventListener('touchstart',  handleTouchStart, { passive: false });
+    container.addEventListener('touchmove',   handleTouchMove,  { passive: false });
+    container.addEventListener('touchend',    handleTouchEnd,   { passive: true  });
+    container.addEventListener('touchcancel', handleTouchEnd,   { passive: true  });
 
     return () => {
-      container.removeEventListener('touchstart', handleTouchStart);
-      container.removeEventListener('touchmove', handleTouchMove);
-      container.removeEventListener('touchend', handleTouchEnd);
+      container.removeEventListener('touchstart',  handleTouchStart);
+      container.removeEventListener('touchmove',   handleTouchMove);
+      container.removeEventListener('touchend',    handleTouchEnd);
       container.removeEventListener('touchcancel', handleTouchEnd);
     };
   }, [boardZoom]);
