@@ -2775,7 +2775,7 @@ export default function App() {
               <div 
                 ref={boardContainerRef}
                 className="w-full p-0 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-2xl overflow-auto overscroll-none flex border-0 md:border touch-manipulation" 
-                style={{ backgroundColor: customColors.boardBg, touchAction: boardZoom > 1.2 ? 'none' : 'manipulation' }}
+                style={{ backgroundColor: customColors.boardBg, touchAction: 'manipulation' }}
               >
                 <div className="select-none p-0.5 md:p-2 rounded-lg md:rounded-xl border mx-auto" style={{ backgroundColor: customColors.boardBg, borderColor: isDark ? '#0f1114' : '#d1d5db' }}>
                   <div
