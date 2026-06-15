@@ -516,7 +516,7 @@ export default function App() {
   const handleCreateRoom = async (gridSize, config) => {
     if (!user) return;
     setError('');
-    const newRoomId = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const newRoomId = Math.floor(1000 + Math.random() * 9000).toString();
     
     const maxPlayers = config.threePlayerMode ? 3 : 2;
     const decks = generateEvenDecks(gridSize, maxPlayers, config.evenDistributionMode);
@@ -1403,7 +1403,8 @@ export default function App() {
       player.score -= deduction;
       
       if (deduction > 0) {
-        details.push(`${player.name} lost ${deduction} pts for unplayed tiles.`);
+        const letters = player.rack.map(t => t.letter).join(', ');
+        details.push(`${player.name} lost ${deduction} pts for unplayed tiles (${letters}).`);
       }
 
       if (uid !== triggeringPlayerId) {
@@ -1441,7 +1442,20 @@ export default function App() {
       sc.push("           FINAL SCORE CARD             ");
       sc.push("----------------------------------------");
       playerList.forEach((p, idx) => {
-        sc.push(`${idx + 1}. ${p.name}: ${p.score} pts`);
+        const origPlayer = currentPlayers[p.uid];
+        const origScore = origPlayer.score;
+        let unplayedSum = 0;
+        origPlayer.rack.forEach(t => unplayedSum += t.score);
+        
+        let line = `${idx + 1}. ${p.name}: ${p.score} pts (started with ${origScore} pts`;
+        if (unplayedSum > 0) {
+          line += `, -${unplayedSum} for unplayed tiles [${origPlayer.rack.map(t => t.letter).join(',')}]`;
+        }
+        if (outOfTiles && p.uid === triggeringPlayerId && outBonus > 0) {
+          line += `, +${outBonus} bonus for going out`;
+        }
+        line += `)`;
+        sc.push(line);
       });
       sc.push("----------------------------------------");
       sc.push("         TURN-BY-TURN RECAP             ");
@@ -2250,13 +2264,13 @@ export default function App() {
               isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-100 border-slate-200'
             }`}>
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className={isDark ? 'text-slate-400' : 'text-slate-505'}>Handle:</span>
+              <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Handle:</span>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => saveNickname(e.target.value)}
                 className={`bg-transparent border-b hover:border-slate-400 focus:border-slate-500 focus:outline-none font-semibold w-32 px-1 py-0.5 transition ${
-                  isDark ? 'border-slate-700 text-slate-300' : 'border-slate-300 text-slate-750'
+                  isDark ? 'border-slate-700 text-slate-300' : 'border-slate-300 text-slate-700'
                 }`}
                 placeholder="Your Nickname"
                 title="Change nickname anytime"
@@ -2279,7 +2293,7 @@ export default function App() {
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-bold transition ${
               isDark 
                 ? 'bg-slate-800 border-slate-700 text-slate-200' 
-                : 'bg-slate-100 border-slate-250 text-slate-700'
+                : 'bg-slate-100 border-slate-200 text-slate-700'
             }`}>
               <span>🎨 Colours</span>
               <button
@@ -2696,7 +2710,7 @@ export default function App() {
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Enter Room Code (e.g. J9FX4)"
+                    placeholder="Enter Room Code (e.g. 1234)"
                     className={`flex-1 focus:outline-none rounded-xl py-3 px-4 uppercase font-black text-center tracking-widest placeholder:normal-case placeholder:font-normal transition-colors border ${
                       isDark 
                         ? 'bg-[#111317] border-[#21252d] hover:border-slate-700 focus:border-slate-500 text-slate-300 placeholder:text-slate-500' 
@@ -2755,7 +2769,7 @@ export default function App() {
                         isMyTurn
                           ? isDark
                             ? 'bg-slate-800 border-slate-600 text-white animate-pulse'
-                            : 'bg-amber-50 border-amber-300 text-amber-850 animate-pulse'
+                            : 'bg-amber-50 border-amber-300 text-amber-800 animate-pulse'
                           : isDark
                             ? 'bg-[#111317] border-[#21252d] text-slate-400'
                             : 'bg-slate-50 border-slate-200 text-slate-500'
@@ -2869,21 +2883,21 @@ export default function App() {
                         let cellClassName = 'rounded-[4px] cursor-pointer flex flex-col items-center justify-center relative transition duration-150 shadow-sm border touch-manipulation';
 
                         if (!bonus) {
-                          cellStyle = { backgroundColor: customColors.boardTile || '#f8fafc', borderColor: isDark ? '#323743' : '#cbd5e1', color: isDark ? '#94a3b8' : '#94a3b8' };
+                          cellStyle = { backgroundColor: customColors.boardTile || '#f8fafc', borderColor: customColors.boardTile || '#f8fafc', color: isDark ? '#94a3b8' : '#94a3b8' };
                         } else if (bonus === 'TW') {
-                          cellStyle = { backgroundColor: customColors.twTile, borderColor: isDark ? '#8f3636' : '#fda4af', color: customColors.twText || '#ffffff' };
+                          cellStyle = { backgroundColor: customColors.twTile, borderColor: customColors.twTile, color: customColors.twText || '#ffffff' };
                           cellLabel = 'TW';
                         } else if (bonus === 'DW') {
-                          cellStyle = { backgroundColor: customColors.dwTile, borderColor: isDark ? '#a85b5b' : '#fecdd3', color: customColors.dwText || '#881337' };
+                          cellStyle = { backgroundColor: customColors.dwTile, borderColor: customColors.dwTile, color: customColors.dwText || '#881337' };
                           cellLabel = 'DW';
                         } else if (bonus === 'TL') {
-                          cellStyle = { backgroundColor: customColors.tlTile || '#2563eb', borderColor: isDark ? '#203c62' : '#93c5fd', color: customColors.tlText || '#ffffff' };
+                          cellStyle = { backgroundColor: customColors.tlTile || '#2563eb', borderColor: customColors.tlTile || '#2563eb', color: customColors.tlText || '#ffffff' };
                           cellLabel = 'TL';
                         } else if (bonus === 'DL') {
-                          cellStyle = { backgroundColor: customColors.dlTile, borderColor: isDark ? '#335372' : '#bae6fd', color: customColors.dlText || '#0c4a6e' };
+                          cellStyle = { backgroundColor: customColors.dlTile, borderColor: customColors.dlTile, color: customColors.dlText || '#0c4a6e' };
                           cellLabel = 'DL';
                         } else if (bonus === 'star') {
-                          cellStyle = { backgroundColor: customColors.dwTile, borderColor: isDark ? '#a85b5b' : '#fecdd3', color: customColors.dwText || '#881337' };
+                          cellStyle = { backgroundColor: customColors.dwTile, borderColor: customColors.dwTile, color: customColors.dwText || '#881337' };
                           cellLabel = '★';
                         }
 
@@ -3047,7 +3061,7 @@ export default function App() {
                             <span key={i} className={`px-2 py-0.5 rounded text-xs font-mono transition-all duration-200 border ${
                               (coloursEnabled && valid)
                                 ? isDark ? 'bg-[#14532d] text-[#4ade80] border-[#16a34a]/30' : 'bg-[#dcfce7] text-[#15803d] border-[#bbf7d0]'
-                                : isDark ? 'bg-slate-800 border-transparent text-white' : 'bg-slate-200 border-transparent text-slate-805'
+                                : isDark ? 'bg-slate-800 border-transparent text-white' : 'bg-slate-200 border-transparent text-slate-800'
                             }`}>
                               {w.forwardWord} ({w.score} pts)
                               {(roomData.backwardsAllowed || roomData.diagonalBackwardsAllowed) && w.forwardWord !== w.backwardWord && ` / ${w.backwardWord}`}
@@ -3065,7 +3079,7 @@ export default function App() {
                       </div>
                     )}
                     {scoreReport.error && (
-                      <div className="text-xs text-rose-455">
+                      <div className="text-xs text-rose-600">
                         ❌ Invalid layout: {scoreReport.error}
                       </div>
                     )}
@@ -3175,8 +3189,8 @@ export default function App() {
                     disabled={!isMyTurn || Object.keys(tentativePlaced).length === 0 || roomData?.status === 'finished'}
                     className={`col-span-2 md:col-span-1 font-black py-2.5 px-3 rounded-xl text-xs shadow-lg transition active:scale-95 border ${
                       isDark 
-                        ? 'bg-slate-300 hover:bg-slate-200 text-slate-955 border-slate-400 disabled:bg-slate-800 disabled:border-slate-700 disabled:text-slate-550' 
-                        : 'bg-slate-200 hover:bg-slate-300 text-slate-955 border-slate-300 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-455'
+                        ? 'bg-slate-300 hover:bg-slate-200 text-slate-900 border-slate-400 disabled:bg-slate-800 disabled:border-slate-700 disabled:text-slate-500' 
+                        : 'bg-slate-200 hover:bg-slate-300 text-slate-900 border-slate-300 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400'
                     } disabled:shadow-none disabled:opacity-50`}
                   >
                     🚀 Play Word
@@ -3189,7 +3203,7 @@ export default function App() {
               {roomData.status === 'finished' && (
                 <div className={`border p-5 rounded-2xl shadow-xl space-y-4 transition-all duration-300 ${
                   isDark 
-                    ? 'border-[#21252d] bg-[#15181d] text-slate-350 shadow-xl' 
+                    ? 'border-[#21252d] bg-[#15181d] text-slate-300 shadow-xl' 
                     : 'border-slate-200 bg-white text-slate-700 shadow-xl'
                 }`}>
                   <h3 className={`text-base font-extrabold flex items-center gap-2 ${
@@ -3198,19 +3212,58 @@ export default function App() {
                     🏆 Final Game Scorecard
                   </h3>
                   <div className="space-y-2">
-                    {Object.values(roomData.players).sort((a, b) => b.score - a.score).map((p, idx) => (
-                      <div key={p.uid} className={`flex justify-between items-center p-2.5 rounded-xl border ${
-                        isDark 
-                          ? 'bg-[#111317] border-slate-800' 
-                          : 'bg-slate-50 border-slate-200'
-                      }`}>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-sm font-bold ${isDark ? 'text-slate-300' : 'text-slate-750'}`}>{idx + 1}. {p.name}</span>
-                          {idx === 0 && <span className="text-xs">👑</span>}
+                    {Object.values(roomData.players).sort((a, b) => b.score - a.score).map((p, idx) => {
+                      let unplayedSum = 0;
+                      const rackLetters = (p.rack || []).map(t => t.letter).filter(Boolean);
+                      (p.rack || []).forEach(tile => { unplayedSum += tile.score; });
+                      
+                      // Determine if this player went out
+                      const allPlayers = Object.values(roomData.players);
+                      const gameEndedByGoingOut = allPlayers.some(pl => (pl.rack || []).length === 0 && (pl.deck || []).length === 0);
+                      const wentOut = gameEndedByGoingOut && (p.rack || []).length === 0;
+                      
+                      // If they went out, their bonus is the sum of all other players' remaining rack values
+                      let bonusReceived = 0;
+                      if (wentOut) {
+                        allPlayers.forEach(pl => {
+                          if (pl.uid !== p.uid) {
+                            (pl.rack || []).forEach(t => { bonusReceived += t.score; });
+                          }
+                        });
+                      }
+                      
+                      const origScore = p.score + unplayedSum - bonusReceived;
+                      
+                      return (
+                        <div key={p.uid} className={`flex flex-col p-2.5 rounded-xl border ${
+                          isDark 
+                            ? 'bg-[#111317] border-slate-800' 
+                            : 'bg-slate-50 border-slate-200'
+                        }`}>
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-bold ${isDark ? 'text-slate-300' : 'text-slate-750'}`}>{idx + 1}. {p.name}</span>
+                              {idx === 0 && <span className="text-xs">👑</span>}
+                              {wentOut && <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-semibold border border-emerald-500/30">OUT</span>}
+                            </div>
+                            <span className={`text-sm font-black ${isDark ? 'text-indigo-350' : 'text-indigo-650'}`}>{p.score} pts</span>
+                          </div>
+                          <div className={`text-[10px] mt-1 flex flex-wrap gap-x-2 gap-y-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                            <span>Base: {origScore} pts</span>
+                            {unplayedSum > 0 && (
+                              <span className="text-rose-400">
+                                Deduction: -{unplayedSum} (Left: {rackLetters.join(', ')})
+                              </span>
+                            )}
+                            {bonusReceived > 0 && (
+                              <span className="text-emerald-400">
+                                Bonus: +{bonusReceived} (from opponents)
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <span className={`text-sm font-black ${isDark ? 'text-indigo-350' : 'text-indigo-650'}`}>{p.score} pts</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   <div className={`space-y-2 pt-2 border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
@@ -3260,7 +3313,7 @@ export default function App() {
                   <div className={`p-4 rounded-xl border flex items-center justify-between transition ${
                     roomData.activePlayerId === user.uid
                       ? isDark
-                        ? 'bg-slate-850 border-slate-700 ring-1 ring-slate-550/20'
+                        ? 'bg-slate-850 border-slate-700 ring-1 ring-slate-500/20'
                         : 'bg-amber-50 border-amber-300 ring-1 ring-amber-400/20'
                       : isDark
                         ? 'bg-[#111317] border-[#21252d]'
@@ -3275,7 +3328,7 @@ export default function App() {
                     </div>
                     <div className="text-right">
                       <span className={`text-2xl font-black transition-colors ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{me?.score}</span>
-                      <span className={`text-xs block transition-colors ${isDark ? 'text-slate-550' : 'text-slate-400'}`}>pts</span>
+                      <span className={`text-xs block transition-colors ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>pts</span>
                     </div>
                   </div>
 
@@ -3288,7 +3341,7 @@ export default function App() {
                       <div key={oppId} className={`p-4 rounded-xl border flex items-center justify-between transition ${
                         roomData.activePlayerId === oppId
                           ? isDark
-                            ? 'bg-slate-850 border-slate-700 ring-1 ring-slate-550/20'
+                            ? 'bg-slate-850 border-slate-700 ring-1 ring-slate-500/20'
                             : 'bg-amber-50 border-amber-300 ring-1 ring-amber-400/20'
                           : isDark
                             ? 'bg-[#111317] border-[#21252d]'
@@ -3303,7 +3356,7 @@ export default function App() {
                         </div>
                         <div className="text-right">
                           <span className={`text-2xl font-black transition-colors ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{opp.score}</span>
-                          <span className={`text-xs block transition-colors ${isDark ? 'text-slate-550' : 'text-slate-400'}`}>pts</span>
+                          <span className={`text-xs block transition-colors ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>pts</span>
                         </div>
                       </div>
                     );
@@ -3311,7 +3364,7 @@ export default function App() {
                   
                   {roomData.playerOrder.length < (roomData.maxPlayers || 2) && (
                     <div className={`border p-4 rounded-xl text-center text-xs transition-colors ${
-                      isDark ? 'bg-[#111317]/50 border-dashed border-[#21252d] text-slate-500' : 'bg-slate-50 border-dashed border-slate-250 text-slate-400'
+                      isDark ? 'bg-[#111317]/50 border-dashed border-[#21252d] text-slate-500' : 'bg-slate-50 border-dashed border-slate-200 text-slate-400'
                     }`}>
                       Waiting for opponents...
                     </div>
@@ -3441,7 +3494,7 @@ export default function App() {
 
                 <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3">
                   {(roomData.chat || []).length === 0 ? (
-                    <p className={`text-xs italic text-center my-auto transition-colors ${isDark ? 'text-slate-650' : 'text-slate-400'}`}>No messages yet. Say hi!</p>
+                    <p className={`text-xs italic text-center my-auto transition-colors ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>No messages yet. Say hi!</p>
                   ) : (
                     roomData.chat.map((msg) => {
                       const isMe = msg.senderId === user.uid;
@@ -3449,17 +3502,17 @@ export default function App() {
                         <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                           <div className="flex items-baseline gap-1.5">
                             <span className={`text-[10px] font-bold transition-colors ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{msg.senderName}</span>
-                            <span className={`text-[8px] transition-colors ${isDark ? 'text-slate-650' : 'text-slate-450'}`}>
+                            <span className={`text-[8px] transition-colors ${isDark ? 'text-slate-500' : 'text-slate-450'}`}>
                               {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
                           <div className={`mt-0.5 max-w-[85%] px-3 py-1.5 rounded-2xl text-xs leading-normal ${
                             isMe
                               ? isDark
-                                ? 'bg-slate-300 text-slate-955 rounded-tr-none'
-                                : 'bg-slate-205 text-slate-900 border border-slate-300 rounded-tr-none'
+                                ? 'bg-slate-300 text-black rounded-tr-none'
+                                : 'bg-slate-200 text-slate-900 border border-slate-300 rounded-tr-none'
                               : isDark
-                                ? 'bg-slate-800 text-slate-200 rounded-tl-none'
+                                ? 'bg-slate-800 text-slate-100 rounded-tl-none'
                                 : 'bg-white text-slate-800 border border-slate-200 rounded-tl-none'
                           }`}>
                             {msg.text}
@@ -3517,21 +3570,21 @@ export default function App() {
                     </svg>
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-slate-350">
+                <div className="grid grid-cols-2 gap-2 text-slate-400">
                   <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
-                    <span className="text-slate-550 block">Grid Size:</span>
+                    <span className="text-slate-400 block">Grid Size:</span>
                     <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.gridSize}x{roomData.gridSize}</span>
                   </div>
                   <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
-                    <span className="text-slate-550 block">Rack Size:</span>
+                    <span className="text-slate-400 block">Rack Size:</span>
                     <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.rackSize} tiles</span>
                   </div>
                   <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
-                    <span className="text-slate-550 block">Diagonals:</span>
+                    <span className="text-slate-400 block">Diagonals:</span>
                     <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.diagonalAllowed ? 'Allowed' : 'Disabled'}</span>
                   </div>
                   <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
-                    <span className="text-slate-550 block">Backwards:</span>
+                    <span className="text-slate-400 block">Backwards:</span>
                     <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.backwardsAllowed ? 'Allowed' : (roomData.diagonalBackwardsAllowed ? 'Diag Only' : 'Disabled')}</span>
                   </div>
                 </div>
