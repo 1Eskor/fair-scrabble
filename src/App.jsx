@@ -228,6 +228,36 @@ export default function App() {
   const [roomData, setRoomData] = useState(null);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [boardZoom, setBoardZoom] = useState(1);
+
+  // Responsive Board Calculations
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 768);
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  const isMobile = windowWidth < 768;
+  const baseCellSize = (() => {
+    const gridSize = roomData?.gridSize || 15;
+    if (isMobile) {
+      // Calculate mobile cell size dynamically so the board fits perfectly on the screen
+      const totalPaddingAndBorders = 6; // 0px (main layout) + 0px (card padding) + 4px (inner board padding) + 2px (borders)
+      const gapSize = 2;
+      const availableSpaceForCells = windowWidth - totalPaddingAndBorders - (gridSize - 1) * gapSize;
+      const calculatedBase = Math.floor(availableSpaceForCells / gridSize);
+      return Math.max(14, Math.min(28, calculatedBase));
+    } else {
+      // On desktop/tablet, check estimated space (column width is roughly 62% of windowWidth)
+      const estimatedColWidth = Math.floor(windowWidth * 0.62);
+      const totalPaddingAndBorders = 120; // larger paddings on desktop
+      const gapSize = 4;
+      const availableSpaceForCells = estimatedColWidth - totalPaddingAndBorders - (gridSize - 1) * gapSize;
+      const calculatedBase = Math.floor(availableSpaceForCells / gridSize);
+      return Math.max(24, Math.min(38, calculatedBase));
+    }
+  })();
+  const cellSize = Math.round(baseCellSize * boardZoom);
 
   // Theme State ('dark' | 'light')
   const [theme, setTheme] = useState(() => localStorage.getItem('scrabble_theme') || 'dark');
@@ -263,7 +293,6 @@ export default function App() {
   // Local Game State
   const [selectedRackTile, setSelectedRackTile] = useState(null);
   const [tentativePlaced, setTentativePlaced] = useState({}); // "r,c" -> { id, letter, score, isBlank }
-  const [boardZoom, setBoardZoom] = useState(1);
   const [chatInput, setChatInput] = useState('');
   const [blankModalOpen, setBlankModalOpen] = useState(false);
   const [pendingBlankCoords, setPendingBlankCoords] = useState(null);
@@ -335,7 +364,7 @@ export default function App() {
   useEffect(() => {
     const container = boardContainerRef.current;
     const board = innerBoardRef.current;
-    if (!container || !board) return;
+    if (!container || !board || !roomData) return;
     if (boardZoom <= 1.2) return;
 
     let startX = 0, startY = 0, startPanX = 0, startPanY = 0;
@@ -350,8 +379,22 @@ export default function App() {
 
     const onMove = (e) => {
       if (e.touches.length !== 1) return;
-      const nx = startPanX + (e.touches[0].clientX - startX);
-      const ny = startPanY + (e.touches[0].clientY - startY);
+      
+      const gap = isMobile ? 2 : 4;
+      const extra = isMobile ? 6 : 18;
+      const currentCellSize = Math.round(baseCellSize * boardZoom);
+      const boardW = roomData.gridSize * currentCellSize + (roomData.gridSize - 1) * gap + extra;
+
+      let nx = startPanX + (e.touches[0].clientX - startX);
+      let ny = startPanY + (e.touches[0].clientY - startY);
+
+      // Clamp coordinates so the zoomed board doesn't show empty spaces at its edges
+      const minX = Math.min(0, container.clientWidth - boardW);
+      const minY = Math.min(0, container.clientHeight - boardW);
+
+      nx = Math.max(minX, Math.min(0, nx));
+      ny = Math.max(minY, Math.min(0, ny));
+
       panRef.current = { x: nx, y: ny };
       // Mutate DOM directly — no setState, no re-render, no lag
       board.style.transform = `translate(${nx}px,${ny}px)`;
@@ -365,7 +408,7 @@ export default function App() {
       container.removeEventListener('touchstart', onStart);
       container.removeEventListener('touchmove',  onMove);
     };
-  }, [boardZoom]);
+  }, [boardZoom, baseCellSize, isMobile, roomData]);
 
   // Apply saved custom colors on mount
   useEffect(() => {
@@ -776,16 +819,30 @@ export default function App() {
         // Zoom in: set zoom then center pan on tapped cell
         setBoardZoom(2.0);
         setTimeout(() => {
-          if (boardContainerRef.current && innerBoardRef.current) {
+          if (boardContainerRef.current && innerBoardRef.current && roomData) {
             const container = boardContainerRef.current;
+            const board = innerBoardRef.current;
             const newCellSize = baseCellSize * 2.0;
+            const gap = isMobile ? 2 : 4;
+            const extra = isMobile ? 6 : 18;
+            const boardW = roomData.gridSize * newCellSize + (roomData.gridSize - 1) * gap + extra;
+
             // Pan so tapped cell center aligns with container center
             const cellCenterX = c * newCellSize + newCellSize / 2;
             const cellCenterY = r * newCellSize + newCellSize / 2;
-            const px = Math.min(0, container.clientWidth  / 2 - cellCenterX);
-            const py = Math.min(0, container.clientHeight / 2 - cellCenterY);
+
+            let px = container.clientWidth / 2 - cellCenterX;
+            let py = container.clientHeight / 2 - cellCenterY;
+
+            // Clamp initial translation
+            const minX = Math.min(0, container.clientWidth - boardW);
+            const minY = Math.min(0, container.clientHeight - boardW);
+
+            px = Math.max(minX, Math.min(0, px));
+            py = Math.max(minY, Math.min(0, py));
+
             panRef.current = { x: px, y: py };
-            innerBoardRef.current.style.transform = `translate(${px}px,${py}px)`;
+            board.style.transform = `translate(${px}px,${py}px)`;
           }
         }, 80);
       }
@@ -2119,34 +2176,7 @@ export default function App() {
     return () => clearInterval(intervalId);
   }, [roomId, user?.uid]);
 
-  // Responsive Board Calculations
-  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 768);
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-  const isMobile = windowWidth < 768;
-  const baseCellSize = (() => {
-    const gridSize = roomData?.gridSize || 15;
-    if (isMobile) {
-      // Calculate mobile cell size dynamically so the board fits perfectly on the screen
-      const totalPaddingAndBorders = 6; // 0px (main layout) + 0px (card padding) + 4px (inner board padding) + 2px (borders)
-      const gapSize = 2;
-      const availableSpaceForCells = windowWidth - totalPaddingAndBorders - (gridSize - 1) * gapSize;
-      const calculatedBase = Math.floor(availableSpaceForCells / gridSize);
-      return Math.max(14, Math.min(28, calculatedBase));
-    } else {
-      // On desktop/tablet, check estimated space (column width is roughly 62% of windowWidth)
-      const estimatedColWidth = Math.floor(windowWidth * 0.62);
-      const totalPaddingAndBorders = 120; // larger paddings on desktop
-      const gapSize = 4;
-      const availableSpaceForCells = estimatedColWidth - totalPaddingAndBorders - (gridSize - 1) * gapSize;
-      const calculatedBase = Math.floor(availableSpaceForCells / gridSize);
-      return Math.max(24, Math.min(38, calculatedBase));
-    }
-  })();
-  const cellSize = Math.round(baseCellSize * boardZoom);
+
 
   const isDark = theme === 'dark';
 
@@ -2771,6 +2801,9 @@ export default function App() {
                   overflow: boardZoom > 1.2 ? 'hidden' : 'auto',
                   overscrollBehavior: 'none',
                   touchAction: boardZoom > 1.2 ? 'none' : 'manipulation',
+                  height: (boardZoom > 1.2 && roomData)
+                    ? `${roomData.gridSize * baseCellSize + (roomData.gridSize - 1) * (isMobile ? 2 : 4) + (isMobile ? 6 : 18)}px`
+                    : undefined,
                 }}
               >
                 <div
@@ -2786,6 +2819,7 @@ export default function App() {
                       gridTemplateRows: `repeat(${roomData.gridSize}, ${cellSize}px)`
                     }}
                   >
+                    {/* eslint-disable-next-line react-hooks/refs */}
                     {Array.from({ length: roomData.gridSize }).map((_, r) => (
                       Array.from({ length: roomData.gridSize }).map((_, c) => {
                         const key = `${r},${c}`;
