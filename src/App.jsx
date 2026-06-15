@@ -301,6 +301,8 @@ export default function App() {
   const chatContainerRef = useRef(null);
   const prevChatLengthRef = useRef(0);
   const boardContainerRef = useRef(null);
+  const innerBoardRef = useRef(null);    // ref to inner board div for direct transform
+  const panRef = useRef({ x: 0, y: 0 }); // tracks current pan without triggering re-renders
   const lastTapRef = useRef(0);
   const singleTapTimeoutRef = useRef(null);
 
@@ -324,60 +326,44 @@ export default function App() {
     loadDict();
   }, []);
 
-  // Custom drag-to-pan touch handler for 2D free scrolling when zoomed in.
-  // Key insight: touchstart MUST be non-passive so we can call e.preventDefault()
-  // immediately, preventing the browser from initiating its own axis-locking native
-  // scroll. Only then can touchmove freely drive both scroll axes simultaneously.
+  // Free 2D pan when zoomed: drive CSS transform directly on inner board div.
+  // Architecture:
+  //   - container: overflow:hidden + touch-action:none (no native scroll at all)
+  //   - inner board: transform:translate(panX, panY)
+  //   - touch events update the transform via direct DOM mutation (zero React re-renders during drag)
+  //   - NO preventDefault on touchstart => click events still fire => zoom & tile placement work
   useEffect(() => {
     const container = boardContainerRef.current;
-    if (!container) return;
+    const board = innerBoardRef.current;
+    if (!container || !board) return;
+    if (boardZoom <= 1.2) return;
 
-    let isDragging = false;
-    let startX = 0;
-    let startY = 0;
-    let startScrollLeft = 0;
-    let startScrollTop = 0;
+    let startX = 0, startY = 0, startPanX = 0, startPanY = 0;
 
-    const handleTouchStart = (e) => {
-      if (boardZoom <= 1.2) return;
+    const onStart = (e) => {
       if (e.touches.length !== 1) return;
-
-      // CRITICAL: prevent browser from starting its axis-locking native scroll
-      e.preventDefault();
-
-      isDragging = true;
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
-      startScrollLeft = container.scrollLeft;
-      startScrollTop = container.scrollTop;
+      startPanX = panRef.current.x;
+      startPanY = panRef.current.y;
     };
 
-    const handleTouchMove = (e) => {
-      if (!isDragging) return;
+    const onMove = (e) => {
       if (e.touches.length !== 1) return;
-
-      e.preventDefault();
-
-      const dx = e.touches[0].clientX - startX;
-      const dy = e.touches[0].clientY - startY;
-
-      container.scrollLeft = startScrollLeft - dx;
-      container.scrollTop  = startScrollTop  - dy;
+      const nx = startPanX + (e.touches[0].clientX - startX);
+      const ny = startPanY + (e.touches[0].clientY - startY);
+      panRef.current = { x: nx, y: ny };
+      // Mutate DOM directly — no setState, no re-render, no lag
+      board.style.transform = `translate(${nx}px,${ny}px)`;
     };
 
-    const handleTouchEnd = () => { isDragging = false; };
-
-    // Both must be { passive: false } so e.preventDefault() is allowed
-    container.addEventListener('touchstart',  handleTouchStart, { passive: false });
-    container.addEventListener('touchmove',   handleTouchMove,  { passive: false });
-    container.addEventListener('touchend',    handleTouchEnd,   { passive: true  });
-    container.addEventListener('touchcancel', handleTouchEnd,   { passive: true  });
+    // passive:true on both — no preventDefault needed, clicks still fire
+    container.addEventListener('touchstart', onStart, { passive: true });
+    container.addEventListener('touchmove',  onMove,  { passive: true });
 
     return () => {
-      container.removeEventListener('touchstart',  handleTouchStart);
-      container.removeEventListener('touchmove',   handleTouchMove);
-      container.removeEventListener('touchend',    handleTouchEnd);
-      container.removeEventListener('touchcancel', handleTouchEnd);
+      container.removeEventListener('touchstart', onStart);
+      container.removeEventListener('touchmove',  onMove);
     };
   }, [boardZoom]);
 
@@ -782,18 +768,24 @@ export default function App() {
       lastTapRef.current = 0;
 
       if (boardZoom > 1.2) {
+        // Zoom out: reset zoom and clear pan transform
         setBoardZoom(1.0);
+        panRef.current = { x: 0, y: 0 };
+        if (innerBoardRef.current) innerBoardRef.current.style.transform = '';
       } else {
+        // Zoom in: set zoom then center pan on tapped cell
         setBoardZoom(2.0);
         setTimeout(() => {
-          if (boardContainerRef.current) {
+          if (boardContainerRef.current && innerBoardRef.current) {
             const container = boardContainerRef.current;
             const newCellSize = baseCellSize * 2.0;
+            // Pan so tapped cell center aligns with container center
             const cellCenterX = c * newCellSize + newCellSize / 2;
             const cellCenterY = r * newCellSize + newCellSize / 2;
-            const targetLeft = cellCenterX - container.clientWidth / 2;
-            const targetTop = cellCenterY - container.clientHeight / 2;
-            container.scrollTo({ left: Math.max(0, targetLeft), top: Math.max(0, targetTop), behavior: 'smooth' });
+            const px = Math.min(0, container.clientWidth  / 2 - cellCenterX);
+            const py = Math.min(0, container.clientHeight / 2 - cellCenterY);
+            panRef.current = { x: px, y: py };
+            innerBoardRef.current.style.transform = `translate(${px}px,${py}px)`;
           }
         }, 80);
       }
@@ -2769,12 +2761,23 @@ export default function App() {
               </div>
 
               {/* Interactive Scrabble Board Display */}
-              <div 
+              <div
                 ref={boardContainerRef}
-                className="w-full p-0 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-2xl overflow-auto overscroll-none flex border-0 md:border touch-manipulation" 
-                style={{ backgroundColor: customColors.boardBg, touchAction: 'manipulation' }}
+                className="w-full p-0 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-2xl flex border-0 md:border"
+                style={{
+                  backgroundColor: customColors.boardBg,
+                  // When zoomed: hidden+none lets our JS own all touch movement with zero axis-locking
+                  // When normal: auto+manipulation gives native scroll with fast click response
+                  overflow: boardZoom > 1.2 ? 'hidden' : 'auto',
+                  overscrollBehavior: 'none',
+                  touchAction: boardZoom > 1.2 ? 'none' : 'manipulation',
+                }}
               >
-                <div className="select-none p-0.5 md:p-2 rounded-lg md:rounded-xl border mx-auto" style={{ backgroundColor: customColors.boardBg, borderColor: isDark ? '#0f1114' : '#d1d5db' }}>
+                <div
+                  ref={innerBoardRef}
+                  className="select-none p-0.5 md:p-2 rounded-lg md:rounded-xl border mx-auto"
+                  style={{ backgroundColor: customColors.boardBg, borderColor: isDark ? '#0f1114' : '#d1d5db', willChange: boardZoom > 1.2 ? 'transform' : undefined }}
+                >
                   <div
                     className="grid"
                     style={{
