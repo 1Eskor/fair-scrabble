@@ -243,7 +243,7 @@ export default function App() {
     if (isMobile) {
       // Calculate mobile cell size dynamically so the board fits perfectly on the screen
       const totalPaddingAndBorders = 6; // 0px (main layout) + 0px (card padding) + 4px (inner board padding) + 2px (borders)
-      const gapSize = 2;
+      const gapSize = 1;
       const availableSpaceForCells = windowWidth - totalPaddingAndBorders - (gridSize - 1) * gapSize;
       const calculatedBase = Math.floor(availableSpaceForCells / gridSize);
       return Math.max(14, Math.min(28, calculatedBase));
@@ -251,7 +251,7 @@ export default function App() {
       // On desktop/tablet, check estimated space (column width is roughly 62% of windowWidth)
       const estimatedColWidth = Math.floor(windowWidth * 0.62);
       const totalPaddingAndBorders = 120; // larger paddings on desktop
-      const gapSize = 4;
+      const gapSize = 2;
       const availableSpaceForCells = estimatedColWidth - totalPaddingAndBorders - (gridSize - 1) * gapSize;
       const calculatedBase = Math.floor(availableSpaceForCells / gridSize);
       return Math.max(24, Math.min(38, calculatedBase));
@@ -380,7 +380,7 @@ export default function App() {
     const onMove = (e) => {
       if (e.touches.length !== 1) return;
       
-      const gap = isMobile ? 2 : 4;
+      const gap = isMobile ? 1 : 2;
       const extra = isMobile ? 6 : 18;
       const currentCellSize = Math.round(baseCellSize * boardZoom);
       const boardW = roomData.gridSize * currentCellSize + (roomData.gridSize - 1) * gap + extra;
@@ -823,7 +823,7 @@ export default function App() {
             const container = boardContainerRef.current;
             const board = innerBoardRef.current;
             const newCellSize = baseCellSize * 2.0;
-            const gap = isMobile ? 2 : 4;
+            const gap = isMobile ? 1 : 2;
             const extra = isMobile ? 6 : 18;
             const boardW = roomData.gridSize * newCellSize + (roomData.gridSize - 1) * gap + extra;
 
@@ -2802,7 +2802,7 @@ export default function App() {
                   overscrollBehavior: 'none',
                   touchAction: boardZoom > 1.2 ? 'none' : 'manipulation',
                   height: (boardZoom > 1.2 && roomData)
-                    ? `${roomData.gridSize * baseCellSize + (roomData.gridSize - 1) * (isMobile ? 2 : 4) + (isMobile ? 6 : 18)}px`
+                    ? `${roomData.gridSize * baseCellSize + (roomData.gridSize - 1) * (isMobile ? 1 : 2) + (isMobile ? 6 : 18)}px`
                     : undefined,
                 }}
               >
@@ -2814,7 +2814,7 @@ export default function App() {
                   <div
                     className="grid"
                     style={{
-                      gap: isMobile ? '2px' : '4px',
+                      gap: isMobile ? '1px' : '2px',
                       gridTemplateColumns: `repeat(${roomData.gridSize}, ${cellSize}px)`,
                       gridTemplateRows: `repeat(${roomData.gridSize}, ${cellSize}px)`
                     }}
@@ -2830,7 +2830,7 @@ export default function App() {
                         // Layout styling for special squares — use customColors for TW/DW/DL, defaults for blank/TL
                         let cellLabel = '';
                         let cellStyle = {};
-                        let cellClassName = 'rounded-md cursor-pointer flex flex-col items-center justify-center relative transition duration-150 shadow-sm border touch-manipulation';
+                        let cellClassName = 'rounded-[2px] cursor-pointer flex flex-col items-center justify-center relative transition duration-150 shadow-sm border touch-manipulation';
 
                         if (!bonus) {
                           cellStyle = { backgroundColor: customColors.boardTile || '#f8fafc', borderColor: isDark ? '#323743' : '#cbd5e1', color: isDark ? '#94a3b8' : '#94a3b8' };
@@ -2861,7 +2861,7 @@ export default function App() {
                             {/* Render permanent tile */}
                             {permTile && (
                               <div 
-                                className="absolute inset-0 rounded-sm flex flex-col items-center justify-center font-extrabold shadow scale-[0.96]"
+                                className="absolute inset-0 rounded-[2px] flex flex-col items-center justify-center font-extrabold shadow scale-100"
                                 style={{
                                   fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
                                   backgroundColor: customColors.scrTileBg,
@@ -2869,25 +2869,25 @@ export default function App() {
                                   borderWidth: '1px', borderStyle: 'solid', borderColor: isDark ? '#bfa573' : '#bfa573'
                                 }}
                               >
-                                <span className={`leading-none ${permTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.55}px` }}>{permTile.letter}</span>
-                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.24}px`, bottom: `${cellSize * 0.06}px`, right: `${cellSize * 0.06}px`, color: customColors.scrTileText }}>{permTile.score}</span>
-                                {permTile.isBlank && <span className="absolute bg-amber-500 rounded-full ring-1 ring-white/30" style={{ top: `${cellSize * 0.06}px`, right: `${cellSize * 0.06}px`, width: `${cellSize * 0.14}px`, height: `${cellSize * 0.14}px` }} title="Blank representation" />}
+                                <span className={`leading-none ${permTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.70}px` }}>{permTile.letter}</span>
+                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.22}px`, top: `${cellSize * 0.08}px`, right: `${cellSize * 0.08}px`, color: customColors.scrTileText }}>{permTile.score}</span>
+                                {permTile.isBlank && <span className="absolute bg-amber-500 rounded-full ring-1 ring-white/30" style={{ top: `${cellSize * 0.08}px`, left: `${cellSize * 0.08}px`, width: `${cellSize * 0.14}px`, height: `${cellSize * 0.14}px` }} title="Blank representation" />}
                               </div>
                             )}
 
                             {/* Render tentative tile */}
                             {tempTile && (
                               <div 
-                                className="absolute inset-0 border-2 border-amber-500 rounded-sm flex flex-col items-center justify-center font-extrabold shadow scale-[0.96] ring-1 ring-[#4f5666]"
+                                className="absolute inset-0 border-2 border-amber-500 rounded-[2px] flex flex-col items-center justify-center font-extrabold shadow scale-100"
                                 style={{
                                   fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
                                   backgroundColor: customColors.scrTileBg,
                                   color: customColors.scrTileText
                                 }}
                               >
-                                <span className={`leading-none ${tempTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.55}px` }}>{tempTile.letter}</span>
-                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.24}px`, bottom: `${cellSize * 0.06}px`, right: `${cellSize * 0.06}px` }}>{tempTile.score}</span>
-                                {tempTile.isBlank && <span className="absolute bg-amber-500 rounded-full ring-1 ring-white/30" style={{ top: `${cellSize * 0.06}px`, right: `${cellSize * 0.06}px`, width: `${cellSize * 0.14}px`, height: `${cellSize * 0.14}px` }} />}
+                                <span className={`leading-none ${tempTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.70}px` }}>{tempTile.letter}</span>
+                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.22}px`, top: `${cellSize * 0.08}px`, right: `${cellSize * 0.08}px` }}>{tempTile.score}</span>
+                                {tempTile.isBlank && <span className="absolute bg-amber-500 rounded-full ring-1 ring-white/30" style={{ top: `${cellSize * 0.08}px`, left: `${cellSize * 0.08}px`, width: `${cellSize * 0.14}px`, height: `${cellSize * 0.14}px` }} />}
                               </div>
                             )}
 
