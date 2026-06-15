@@ -324,6 +324,66 @@ export default function App() {
     loadDict();
   }, []);
 
+  // Custom drag-to-pan touch handler for 2D scrolling when zoomed in
+  useEffect(() => {
+    const container = boardContainerRef.current;
+    if (!container) return;
+
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let startScrollLeft = 0;
+    let startScrollTop = 0;
+
+    const handleTouchStart = (e) => {
+      // Only drag if zoomed in and a single touch is used
+      if (boardZoom <= 1.2) return;
+      if (e.touches.length !== 1) return;
+
+      isDragging = true;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      startScrollLeft = container.scrollLeft;
+      startScrollTop = container.scrollTop;
+    };
+
+    const handleTouchMove = (e) => {
+      if (!isDragging) return;
+      if (e.touches.length !== 1) return;
+
+      const currentX = e.touches[0].clientX;
+      const currentY = e.touches[0].clientY;
+
+      const deltaX = currentX - startX;
+      const deltaY = currentY - startY;
+
+      // Scroll container programmatically
+      container.scrollLeft = startScrollLeft - deltaX;
+      container.scrollTop = startScrollTop - deltaY;
+
+      // Prevent native axis-locking scroll behavior
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+    };
+
+    const handleTouchEnd = () => {
+      isDragging = false;
+    };
+
+    container.addEventListener('touchstart', handleTouchStart, { passive: true });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd, { passive: true });
+    container.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+      container.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, [boardZoom]);
+
   // Apply saved custom colors on mount
   useEffect(() => {
     const apply = (colors) => {
@@ -2715,7 +2775,7 @@ export default function App() {
               <div 
                 ref={boardContainerRef}
                 className="w-full p-0 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-2xl overflow-auto overscroll-none flex border-0 md:border touch-manipulation" 
-                style={{ backgroundColor: customColors.boardBg, touchAction: 'manipulation' }}
+                style={{ backgroundColor: customColors.boardBg, touchAction: boardZoom > 1.2 ? 'none' : 'manipulation' }}
               >
                 <div className="select-none p-0.5 md:p-2 rounded-lg md:rounded-xl border mx-auto" style={{ backgroundColor: customColors.boardBg, borderColor: isDark ? '#0f1114' : '#d1d5db' }}>
                   <div
