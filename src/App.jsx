@@ -708,25 +708,21 @@ export default function App() {
   };
 
   const handleBoardCellTap = (r, c) => {
-    if (!isMobile) {
-      if (tentativePlaced[`${r},${c}`]) {
-        removeTentativeTile(r, c);
-      } else {
-        placeTileOnBoard(r, c);
-      }
-      return;
+    // Perform cell placement or removal immediately on single tap
+    if (tentativePlaced[`${r},${c}`]) {
+      removeTentativeTile(r, c);
+    } else {
+      placeTileOnBoard(r, c);
     }
 
+    if (!isMobile) return;
+
     const now = Date.now();
-    const DOUBLE_TAP_DELAY = 250;
+    const DOUBLE_TAP_DELAY = 300;
 
     if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
-      // Double tap detected
+      // Double tap detected: Zoom in/out
       lastTapRef.current = 0;
-      if (singleTapTimeoutRef.current) {
-        clearTimeout(singleTapTimeoutRef.current);
-        singleTapTimeoutRef.current = null;
-      }
 
       if (boardZoom > 1.2) {
         setBoardZoom(1.0);
@@ -742,21 +738,10 @@ export default function App() {
             const targetTop = cellCenterY - container.clientHeight / 2;
             container.scrollTo({ left: Math.max(0, targetLeft), top: Math.max(0, targetTop), behavior: 'smooth' });
           }
-        }, 50);
+        }, 80);
       }
     } else {
       lastTapRef.current = now;
-      if (singleTapTimeoutRef.current) {
-        clearTimeout(singleTapTimeoutRef.current);
-      }
-      singleTapTimeoutRef.current = setTimeout(() => {
-        singleTapTimeoutRef.current = null;
-        if (tentativePlaced[`${r},${c}`]) {
-          removeTentativeTile(r, c);
-        } else {
-          placeTileOnBoard(r, c);
-        }
-      }, DOUBLE_TAP_DELAY);
     }
   };
 
@@ -2751,7 +2736,7 @@ export default function App() {
                         // Layout styling for special squares — use customColors for TW/DW/DL, defaults for blank/TL
                         let cellLabel = '';
                         let cellStyle = {};
-                        let cellClassName = 'rounded-md cursor-pointer flex flex-col items-center justify-center relative transition duration-150 shadow-sm border';
+                        let cellClassName = 'rounded-md cursor-pointer flex flex-col items-center justify-center relative transition duration-150 shadow-sm border touch-manipulation';
 
                         if (!bonus) {
                           cellStyle = { backgroundColor: customColors.boardTile || '#f8fafc', borderColor: isDark ? '#323743' : '#cbd5e1', color: isDark ? '#94a3b8' : '#94a3b8' };
@@ -2777,7 +2762,7 @@ export default function App() {
                             key={key}
                             onClick={() => handleBoardCellTap(r, c)}
                             className={cellClassName}
-                            style={{ width: `${cellSize}px`, height: `${cellSize}px`, ...cellStyle }}
+                            style={{ width: `${cellSize}px`, height: `${cellSize}px`, touchAction: 'manipulation', ...cellStyle }}
                           >
                             {/* Render permanent tile */}
                             {permTile && (
