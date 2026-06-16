@@ -81,17 +81,22 @@ const pickWeightedRandom = (candidates, weightsMap) => {
   return candidates[candidates.length - 1];
 };
 
-const generateRandomizedLetterPool = (gridSize, numPlayers, chaosPercent) => {
+const generateRandomizedStandardLetterPool = (gridSize, numPlayers, chaosPercent) => {
   const size = Number(gridSize);
-  const classicCounts = getClassicCounts(size);
+  const classicCounts = { ...getClassicCounts(size) };
+  
+  // EXCLUDE specials (Q, Z, J, X) and S (which are allocated separately) from the standard letters pool
+  delete classicCounts['Q'];
+  delete classicCounts['Z'];
+  delete classicCounts['J'];
+  delete classicCounts['X'];
+  delete classicCounts['S'];
+
   const L_total = Object.values(classicCounts).reduce((sum, q) => sum + q, 0);
 
   const VOWELS = ['A', 'E', 'I', 'O', 'U', 'Y'];
-  const CONSONANTS = ['B', 'C', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'X', 'Z'];
+  const CONSONANTS = ['B', 'C', 'D', 'F', 'G', 'H', 'K', 'L', 'M', 'N', 'P', 'R', 'T', 'V', 'W'];
   const VOWELS_SET = new Set(VOWELS);
-
-  const vowelsInClassic = Object.entries(classicCounts).filter(([letter]) => VOWELS_SET.has(letter)).reduce((sum, [_, q]) => sum + q, 0);
-  const classicTotalScore = Object.entries(classicCounts).reduce((sum, [letter, q]) => sum + q * (TILE_SCORES[letter] || 0), 0);
 
   const minVowels = Math.round(L_total * 0.40);
   const maxVowels = Math.round(L_total * 0.44);
@@ -99,10 +104,12 @@ const generateRandomizedLetterPool = (gridSize, numPlayers, chaosPercent) => {
   // Constraints parameters
   const maxLetterLimit = size === 15 ? 18 : (size === 17 ? 25 : 30);
   const minELimit = size === 15 ? 8 : (size === 17 ? 10 : 12);
-  const maxPowerTilesLimit = size === 15 ? 8 : (size === 17 ? 12 : 16);
 
   const F_chaos = chaosPercent / 100.0;
   const tolerancePercent = 0.05 + 0.15 * F_chaos;
+  
+  // Estimate score range based on classic counts
+  const classicTotalScore = Object.entries(classicCounts).reduce((sum, [letter, q]) => sum + q * (TILE_SCORES[letter] || 0), 0);
   const minPoints = classicTotalScore * (1 - tolerancePercent);
   const maxPoints = classicTotalScore * (1 + tolerancePercent);
 
@@ -171,9 +178,6 @@ const generateRandomizedLetterPool = (gridSize, numPlayers, chaosPercent) => {
     }
     if (!validCaps) continue;
 
-    const powerTilesCount = (candidateCounts['Z'] || 0) + (candidateCounts['Q'] || 0) + (candidateCounts['X'] || 0) + (candidateCounts['J'] || 0);
-    if (powerTilesCount > maxPowerTilesLimit) continue;
-
     const totalScore = Object.entries(candidateCounts).reduce((sum, [letter, qty]) => sum + qty * (TILE_SCORES[letter] || 0), 0);
     if (totalScore < minPoints || totalScore > maxPoints) continue;
 
@@ -239,77 +243,6 @@ const generateEvenDecks = (gridSize, numPlayers = 2, config = {}) => {
       decks[index % numPlayers].push(makeItem(item));
     });
   };
-
-  const randomizeBagLetters = config.randomizeBagLetters !== undefined ? config.randomizeBagLetters : 0;
-  if (randomizeBagLetters > 0) {
-    // 1. Blanks Allocation
-    const blanks = Array.from({ length: blankTilesCount * numPlayers }, () => '_');
-    dealToDecks(blanks, letter => ({ id: Math.random().toString(), letter, score: 0 }));
-
-    // 2. Generate and allocate randomized pool
-    const randomizedLettersPool = generateRandomizedLetterPool(size, numPlayers, randomizeBagLetters);
-
-    let evenDecks = Array.from({ length: numPlayers }, () => []);
-    let randomPool = [];
-    const F = distributionShuffling / 100.0;
-
-    Object.entries(randomizedLettersPool).forEach(([letter, qty]) => {
-      const qRand = Math.round(qty * F);
-      const qEven = qty - qRand;
-      
-      const perPlayer = Math.floor(qEven / numPlayers);
-      const remainder = qEven % numPlayers;
-      
-      for (let p = 0; p < numPlayers; p++) {
-        for (let i = 0; i < perPlayer; i++) {
-          evenDecks[p].push(letter);
-        }
-      }
-      for (let i = 0; i < remainder; i++) {
-        randomPool.push(letter);
-      }
-      for (let i = 0; i < qRand; i++) {
-        randomPool.push(letter);
-      }
-    });
-
-    if (config.communityBagEnabled) {
-      evenDecks.forEach((playerStandards, pIdx) => {
-        playerStandards.forEach(letter => {
-          decks[pIdx].push({ id: Math.random().toString(), letter, score: getTileScore(letter) });
-        });
-      });
-
-      const communityEvenPools = {};
-      decks.forEach((deck, idx) => {
-        communityEvenPools[idx] = shuffleArray(deck);
-      });
-
-      return {
-        communityDeck: {
-          sharedRandomPool: shuffleArray(randomPool.map(letter => ({ id: Math.random().toString(), letter, score: getTileScore(letter) }))),
-          evenPools: communityEvenPools
-        }
-      };
-    } else {
-      randomPool = shuffleArray(randomPool);
-      randomPool.forEach((letter, index) => {
-        evenDecks[index % numPlayers].push(letter);
-      });
-
-      evenDecks.forEach((playerStandards, pIdx) => {
-        playerStandards.forEach(letter => {
-          decks[pIdx].push({ id: Math.random().toString(), letter, score: getTileScore(letter) });
-        });
-      });
-
-      const resultDecks = {};
-      decks.forEach((deck, idx) => {
-        resultDecks[`deck${idx + 1}`] = shuffleArray(deck);
-      });
-      return resultDecks;
-    }
-  }
 
   // 1. Specials Allocation
   if (numPlayers === 2 && qzjxSetting === 'paired') {
@@ -378,12 +311,18 @@ const generateEvenDecks = (gridSize, numPlayers = 2, config = {}) => {
   const esses = Array.from({ length: playerSCount * numPlayers }, () => 'S');
   dealToDecks(esses, letter => ({ id: Math.random().toString(), letter, score: 1 }));
 
-  // 4. Standards
+  // 4. Standards (Classic OR Randomized)
+  let lettersPoolToUse = standardLettersPool;
+  const randomizeBagLetters = config.randomizeBagLetters !== undefined ? config.randomizeBagLetters : 0;
+  if (randomizeBagLetters > 0) {
+    lettersPoolToUse = generateRandomizedStandardLetterPool(size, numPlayers, randomizeBagLetters);
+  }
+
   let evenDecks = Array.from({ length: numPlayers }, () => []);
   let randomPool = [];
   const F = distributionShuffling / 100.0;
 
-  Object.entries(standardLettersPool).forEach(([letter, qty]) => {
+  Object.entries(lettersPoolToUse).forEach(([letter, qty]) => {
     const qRand = Math.round(qty * F);
     const qEven = qty - qRand;
     
@@ -568,29 +507,112 @@ export default function App() {
   });
 
   // Lobby Pre-select State
-  const [selectedGridSize, setSelectedGridSize] = useState(15);
-  const [diagonalAllowed, setDiagonalAllowed] = useState(false);
-  const [backwardsAllowed, setBackwardsAllowed] = useState(false);
-  const [diagonalBackwardsAllowed, setDiagonalBackwardsAllowed] = useState(false);
-  const [validationMode, setValidationMode] = useState('manual');
-  const [timerEnabled, setTimerEnabled] = useState(false);
-  const [timerDuration, setTimerDuration] = useState(90);
-  const [threePlayerMode, setThreePlayerMode] = useState(false);
-  const [distributionShuffling, setDistributionShuffling] = useState(100);
-  const [blankTilesCount, setBlankTilesCount] = useState(1);
-  const [blankTilesScored, setBlankTilesScored] = useState(false);
-  const [communityBagEnabled, setCommunityBagEnabled] = useState(false);
-  const [qzjxSetting, setQzjxSetting] = useState('random2');
-  const [randomizeBagLetters, setRandomizeBagLetters] = useState(0);
+  const [selectedGridSize, setSelectedGridSize] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_gridSize');
+    return stored !== null ? Number(stored) : 15;
+  });
+  const [diagonalAllowed, setDiagonalAllowed] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_diagonalAllowed');
+    return stored !== null ? stored === 'true' : false;
+  });
+  const [backwardsAllowed, setBackwardsAllowed] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_backwardsAllowed');
+    return stored !== null ? stored === 'true' : false;
+  });
+  const [diagonalBackwardsAllowed, setDiagonalBackwardsAllowed] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_diagonalBackwardsAllowed');
+    return stored !== null ? stored === 'true' : false;
+  });
+  const [validationMode, setValidationMode] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_validationMode');
+    return stored !== null ? stored : 'manual';
+  });
+  const [timerEnabled, setTimerEnabled] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_timerEnabled');
+    return stored !== null ? stored === 'true' : false;
+  });
+  const [timerDuration, setTimerDuration] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_timerDuration');
+    return stored !== null ? Number(stored) : 90;
+  });
+  const [threePlayerMode, setThreePlayerMode] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_threePlayerMode');
+    return stored !== null ? stored === 'true' : false;
+  });
+  const [distributionShuffling, setDistributionShuffling] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_distributionShuffling');
+    return stored !== null ? Number(stored) : 100;
+  });
+  const [blankTilesCount, setBlankTilesCount] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_blankTilesCount');
+    return stored !== null ? Number(stored) : 1;
+  });
+  const [blankTilesScored, setBlankTilesScored] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_blankTilesScored');
+    return stored !== null ? stored === 'true' : false;
+  });
+  const [communityBagEnabled, setCommunityBagEnabled] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_communityBagEnabled');
+    return stored !== null ? stored === 'true' : false;
+  });
+  const [qzjxSetting, setQzjxSetting] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_qzjxSetting');
+    return stored !== null ? stored : 'random2';
+  });
+  const [randomizeBagLetters, setRandomizeBagLetters] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_randomizeBagLetters');
+    return stored !== null ? Number(stored) : 0;
+  });
+  const [selectedRackSize, setSelectedRackSize] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_rackSize');
+    return stored !== null ? Number(stored) : 7;
+  });
+  const [handicapEnabled, setHandicapEnabled] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_handicapEnabled');
+    return stored !== null ? stored === 'true' : false;
+  });
+  const [handicapP1, setHandicapP1] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_handicapP1');
+    return stored !== null ? Number(stored) : 0;
+  });
+  const [handicapP2, setHandicapP2] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_handicapP2');
+    return stored !== null ? Number(stored) : 0;
+  });
+  const [handicapP3, setHandicapP3] = useState(() => {
+    const stored = localStorage.getItem('scrabble_lobby_handicapP3');
+    return stored !== null ? Number(stored) : 0;
+  });
 
   useEffect(() => {
-    setBlankTilesCount(selectedGridSize === 15 ? 1 : (selectedGridSize === 17 ? 2 : 3));
-  }, [selectedGridSize]);
+    localStorage.setItem('scrabble_lobby_gridSize', selectedGridSize);
+    localStorage.setItem('scrabble_lobby_diagonalAllowed', diagonalAllowed);
+    localStorage.setItem('scrabble_lobby_backwardsAllowed', backwardsAllowed);
+    localStorage.setItem('scrabble_lobby_diagonalBackwardsAllowed', diagonalBackwardsAllowed);
+    localStorage.setItem('scrabble_lobby_validationMode', validationMode);
+    localStorage.setItem('scrabble_lobby_timerEnabled', timerEnabled);
+    localStorage.setItem('scrabble_lobby_timerDuration', timerDuration);
+    localStorage.setItem('scrabble_lobby_threePlayerMode', threePlayerMode);
+    localStorage.setItem('scrabble_lobby_distributionShuffling', distributionShuffling);
+    localStorage.setItem('scrabble_lobby_blankTilesCount', blankTilesCount);
+    localStorage.setItem('scrabble_lobby_blankTilesScored', blankTilesScored);
+    localStorage.setItem('scrabble_lobby_communityBagEnabled', communityBagEnabled);
+    localStorage.setItem('scrabble_lobby_qzjxSetting', qzjxSetting);
+    localStorage.setItem('scrabble_lobby_randomizeBagLetters', randomizeBagLetters);
+    localStorage.setItem('scrabble_lobby_rackSize', selectedRackSize);
+    localStorage.setItem('scrabble_lobby_handicapEnabled', handicapEnabled);
+    localStorage.setItem('scrabble_lobby_handicapP1', handicapP1);
+    localStorage.setItem('scrabble_lobby_handicapP2', handicapP2);
+    localStorage.setItem('scrabble_lobby_handicapP3', handicapP3);
+  }, [
+    selectedGridSize, diagonalAllowed, backwardsAllowed, diagonalBackwardsAllowed,
+    validationMode, timerEnabled, timerDuration, threePlayerMode,
+    distributionShuffling, blankTilesCount, blankTilesScored,
+    communityBagEnabled, qzjxSetting, randomizeBagLetters, selectedRackSize,
+    handicapEnabled, handicapP1, handicapP2, handicapP3
+  ]);
+
   const [joinInput, setJoinInput] = useState('');
-  const [handicapEnabled, setHandicapEnabled] = useState(false);
-  const [handicapP1, setHandicapP1] = useState(0);
-  const [handicapP2, setHandicapP2] = useState(0);
-  const [handicapP3, setHandicapP3] = useState(0);
 
   // Local Game State
   const [selectedRackTile, setSelectedRackTile] = useState(null);
@@ -910,6 +932,16 @@ export default function App() {
     return () => unsubscribe();
   }, [user, roomId]);
 
+  // Clear local tentative placements and selections when the board is reset/rematched
+  useEffect(() => {
+    if (roomData && Object.keys(roomData.board).length === 0 && roomData.status === 'playing') {
+      setTentativePlaced({});
+      setSelectedRackTile(null);
+      setExchangeMode(false);
+      setSelectedExchangeIds([]);
+    }
+  }, [roomData?.status, roomData?.board ? Object.keys(roomData.board).length : 0]);
+
   // Scroll chat to bottom only when a new message is actually added
   useEffect(() => {
     const currentLength = roomData?.chat?.length || 0;
@@ -947,7 +979,7 @@ export default function App() {
     const maxPlayers = config.threePlayerMode ? 3 : 2;
     const decksResult = generateEvenDecks(gridSize, maxPlayers, config);
 
-    const rackSize = gridSize === 15 ? 7 : (gridSize === 17 ? 8 : 9);
+    const rackSize = config.rackSize || (gridSize === 15 ? 7 : (gridSize === 17 ? 8 : 9));
 
     const initialRoom = {
       roomId: newRoomId,
@@ -2446,6 +2478,85 @@ export default function App() {
     }
   };
 
+  const handleRematch = async () => {
+    if (!roomData || !roomId) return;
+    setError('');
+    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
+
+    const maxPlayers = roomData.maxPlayers || 2;
+    const decksResult = generateEvenDecks(roomData.gridSize, maxPlayers, {
+      distributionShuffling: roomData.distributionShuffling,
+      blankTilesCount: roomData.blankTilesCount,
+      blankTilesScored: roomData.blankTilesScored,
+      communityBagEnabled: roomData.communityBagEnabled,
+      qzjxSetting: roomData.qzjxSetting,
+      randomizeBagLetters: roomData.randomizeBagLetters || 0
+    });
+
+    const updatedPlayers = {};
+    const rackSize = roomData.rackSize;
+    let currentCommunity = roomData.communityBagEnabled ? { ...decksResult.communityDeck } : null;
+
+    roomData.playerOrder.forEach((uid, idx) => {
+      const p = roomData.players[uid];
+      const initialScore = roomData.handicapEnabled ? (roomData.handicaps?.[idx] || 0) : 0;
+      
+      let pDeck = [];
+      let pRack = [];
+
+      if (roomData.communityBagEnabled) {
+        const { drawn, updates } = drawTilesForPlayer(
+          { ...roomData, playerOrder: roomData.playerOrder, communityDeck: currentCommunity },
+          uid,
+          rackSize
+        );
+        pRack = drawn;
+        currentCommunity = updates.communityDeck;
+      } else {
+        const myDeckKey = `deck${idx + 1}`;
+        const freshDeck = [...(decksResult[myDeckKey] || [])];
+        pRack = freshDeck.slice(0, rackSize);
+        pDeck = freshDeck.slice(rackSize);
+      }
+
+      updatedPlayers[uid] = {
+        uid,
+        name: p.name,
+        score: initialScore,
+        deck: pDeck,
+        rack: pRack,
+        isReady: true,
+        lastActive: Date.now()
+      };
+    });
+
+    try {
+      await updateDoc(roomRef, {
+        board: {},
+        chat: [],
+        history: [
+          {
+            id: Math.random().toString(),
+            timestamp: Date.now(),
+            type: 'system',
+            message: "🔄 A rematch has started! Board cleared."
+          }
+        ],
+        players: updatedPlayers,
+        status: 'playing',
+        turnIndex: 0,
+        consecutiveZeroTurns: 0,
+        activePlayerId: roomData.playerOrder[0],
+        turnStartTime: Date.now(),
+        communityDeck: roomData.communityBagEnabled ? currentCommunity : null,
+        decks: roomData.communityBagEnabled ? null : decksResult
+      });
+      showTemporarySuccess("Rematch started!");
+    } catch (err) {
+      setError("Failed to start rematch: " + err.message);
+    }
+  };
+
   // Dictionary lookup function
   const checkWordLocal = (word) => {
     if (!word || word.length < 2) return false;
@@ -2989,7 +3100,11 @@ export default function App() {
                         <button
                           key={opt.size}
                           type="button"
-                          onClick={() => setSelectedGridSize(opt.size)}
+                          onClick={() => {
+                            setSelectedGridSize(opt.size);
+                            setSelectedRackSize(opt.size === 15 ? 7 : (opt.size === 17 ? 8 : 9));
+                            setBlankTilesCount(opt.size === 15 ? 1 : (opt.size === 17 ? 2 : 3));
+                          }}
                           className={`p-3 rounded-xl border text-center transition flex flex-col justify-center items-center gap-1 ${
                             isActive
                               ? isDark
@@ -3305,6 +3420,30 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Rack Size Setting */}
+                <div className="space-y-2">
+                  <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${
+                    isDark ? 'text-slate-400' : 'text-slate-500'
+                  }`}>Rack Size</label>
+                  <div className={`p-4 rounded-xl border transition-colors ${
+                    isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <select
+                      value={selectedRackSize}
+                      onChange={(e) => setSelectedRackSize(Number(e.target.value))}
+                      className={`w-full text-sm rounded-lg p-2 border font-bold ${
+                        isDark ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-850'
+                      }`}
+                    >
+                      {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(size => (
+                        <option key={size} value={size}>
+                          {size} Tiles {size === (selectedGridSize === 15 ? 7 : (selectedGridSize === 17 ? 8 : 9)) ? '[Default]' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 {/* Randomize Bag Letters setting */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
@@ -3432,6 +3571,7 @@ export default function App() {
                     communityBagEnabled,
                     qzjxSetting,
                     randomizeBagLetters,
+                    rackSize: selectedRackSize,
                     handicapEnabled,
                     handicaps: [handicapP1, handicapP2, handicapP3]
                   })}
@@ -3536,10 +3676,22 @@ export default function App() {
                       )}
                     </div>
                   ) : roomData.status === 'finished' ? (
-                    <div className={`px-4 py-2 rounded-xl border text-sm font-black flex items-center gap-2 transition-colors shadow-lg ${
-                      isDark ? 'bg-indigo-900 border-indigo-700 text-indigo-100' : 'bg-indigo-100 border-indigo-300 text-indigo-800'
-                    }`}>
-                      🏆 GAME OVER
+                    <div className="flex items-center gap-2">
+                      <div className={`px-4 py-2 rounded-xl border text-sm font-black flex items-center gap-2 transition-colors shadow-lg ${
+                        isDark ? 'bg-indigo-900 border-indigo-700 text-indigo-100' : 'bg-indigo-100 border-indigo-300 text-indigo-800'
+                      }`}>
+                        🏆 GAME OVER
+                      </div>
+                      <button
+                        onClick={handleRematch}
+                        className={`px-4 py-2 rounded-xl border text-sm font-extrabold flex items-center gap-2 transition active:scale-95 shadow-lg ${
+                          isDark 
+                            ? 'bg-emerald-800 hover:bg-emerald-700 border-emerald-600 text-white' 
+                            : 'bg-emerald-100 hover:bg-emerald-200 border-emerald-300 text-emerald-800'
+                        }`}
+                      >
+                        🔄 Rematch
+                      </button>
                     </div>
                   ) : (
                     <div className={`border px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
@@ -3739,24 +3891,30 @@ export default function App() {
                     isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-100 border-slate-200'
                   }`}>
                     {(() => {
-                      const rackSize = roomData?.gridSize === 15 ? 7 : (roomData?.gridSize === 17 ? 8 : 9);
-                      const letterSizeClass = rackSize === 9 
-                        ? "text-sm sm:text-base md:text-lg lg:text-xl"
-                        : rackSize === 8
-                          ? "text-base sm:text-lg md:text-xl lg:text-2xl"
-                          : "text-lg sm:text-xl md:text-2xl lg:text-3xl";
+                      const rackSize = roomData?.rackSize || 7;
+                      const letterSizeClass = rackSize >= 10
+                        ? "text-xs sm:text-sm md:text-base lg:text-lg"
+                        : rackSize === 9 
+                          ? "text-sm sm:text-base md:text-lg lg:text-xl"
+                          : rackSize === 8
+                            ? "text-base sm:text-lg md:text-xl lg:text-2xl"
+                            : "text-lg sm:text-xl md:text-2xl lg:text-3xl";
 
-                      const scoreSizeClass = rackSize === 9
-                        ? "text-[7px] sm:text-[8px] md:text-[9px]"
-                        : rackSize === 8
-                          ? "text-[8px] sm:text-[9px] md:text-[10px]"
-                          : "text-[9px] sm:text-[10px] md:text-[11px]";
-                          
-                      const maxTileWidthClass = rackSize === 9
-                        ? "max-w-[38px] sm:max-w-[44px] md:max-w-[50px]"
-                        : rackSize === 8
-                          ? "max-w-[42px] sm:max-w-[48px] md:max-w-[54px]"
-                          : "max-w-[48px] sm:max-w-[54px] md:max-w-[60px]";
+                      const scoreSizeClass = rackSize >= 10
+                        ? "text-[6px] sm:text-[7px] md:text-[8px]"
+                        : rackSize === 9
+                          ? "text-[7px] sm:text-[8px] md:text-[9px]"
+                          : rackSize === 8
+                            ? "text-[8px] sm:text-[9px] md:text-[10px]"
+                            : "text-[9px] sm:text-[10px] md:text-[11px]";
+                            
+                      const maxTileWidthClass = rackSize >= 10
+                        ? "max-w-[30px] sm:max-w-[36px] md:max-w-[42px]"
+                        : rackSize === 9
+                          ? "max-w-[38px] sm:max-w-[44px] md:max-w-[50px]"
+                          : rackSize === 8
+                            ? "max-w-[42px] sm:max-w-[48px] md:max-w-[54px]"
+                            : "max-w-[48px] sm:max-w-[54px] md:max-w-[60px]";
 
                       return me?.rack.map((tile, idx) => {
                         // Check if tile is tentatively placed on the board right now
