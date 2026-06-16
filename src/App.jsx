@@ -50,6 +50,146 @@ const shuffleArray = (array) => {
   return arr;
 };
 
+const getClassicCounts = (gridSize) => {
+  const size = Number(gridSize);
+  if (size === 15) {
+    return {
+      A: 9, B: 2, C: 2, D: 4, E: 12, F: 2, G: 3, H: 2, I: 9, J: 1, K: 1, L: 4, M: 2,
+      N: 6, O: 8, P: 2, Q: 1, R: 6, S: 4, T: 6, U: 4, V: 2, W: 2, X: 1, Y: 2, Z: 1
+    };
+  } else if (size === 17) {
+    return {
+      A: 12, B: 3, C: 3, D: 5, E: 15, F: 3, G: 4, H: 3, I: 12, J: 2, K: 2, L: 5, M: 3,
+      N: 8, O: 11, P: 3, Q: 2, R: 8, S: 8, T: 8, U: 6, V: 3, W: 3, X: 2, Y: 3, Z: 2
+    };
+  } else {
+    return {
+      A: 14, B: 4, C: 4, D: 6, E: 17, F: 4, G: 5, H: 4, I: 14, J: 4, K: 2, L: 6, M: 4,
+      N: 9, O: 12, P: 4, Q: 4, R: 9, S: 12, T: 9, U: 7, V: 4, W: 4, X: 4, Y: 4, Z: 4
+    };
+  }
+};
+
+const pickWeightedRandom = (candidates, weightsMap) => {
+  const totalWeight = candidates.reduce((sum, c) => sum + (weightsMap[c] || 1), 0);
+  let r = Math.random() * totalWeight;
+  for (const c of candidates) {
+    const w = weightsMap[c] || 1;
+    if (r < w) return c;
+    r -= w;
+  }
+  return candidates[candidates.length - 1];
+};
+
+const generateRandomizedLetterPool = (gridSize, numPlayers, chaosPercent) => {
+  const size = Number(gridSize);
+  const classicCounts = getClassicCounts(size);
+  const L_total = Object.values(classicCounts).reduce((sum, q) => sum + q, 0);
+
+  const VOWELS = ['A', 'E', 'I', 'O', 'U', 'Y'];
+  const CONSONANTS = ['B', 'C', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'X', 'Z'];
+  const VOWELS_SET = new Set(VOWELS);
+
+  const vowelsInClassic = Object.entries(classicCounts).filter(([letter]) => VOWELS_SET.has(letter)).reduce((sum, [_, q]) => sum + q, 0);
+  const classicTotalScore = Object.entries(classicCounts).reduce((sum, [letter, q]) => sum + q * (TILE_SCORES[letter] || 0), 0);
+
+  const minVowels = Math.round(L_total * 0.40);
+  const maxVowels = Math.round(L_total * 0.44);
+
+  // Constraints parameters
+  const maxLetterLimit = size === 15 ? 18 : (size === 17 ? 25 : 30);
+  const minELimit = size === 15 ? 8 : (size === 17 ? 10 : 12);
+  const maxPowerTilesLimit = size === 15 ? 8 : (size === 17 ? 12 : 16);
+
+  const F_chaos = chaosPercent / 100.0;
+  const tolerancePercent = 0.05 + 0.15 * F_chaos;
+  const minPoints = classicTotalScore * (1 - tolerancePercent);
+  const maxPoints = classicTotalScore * (1 + tolerancePercent);
+
+  let bestBag = null;
+
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const V_target = Math.floor(Math.random() * (maxVowels - minVowels + 1)) + minVowels;
+    const C_target = L_total - V_target;
+
+    const N_fixed = Math.round(L_total * (1 - F_chaos));
+    const N_random = L_total - N_fixed;
+
+    // 1. Build classic list
+    let classicLettersArray = [];
+    Object.entries(classicCounts).forEach(([letter, qty]) => {
+      for (let i = 0; i < qty; i++) {
+        classicLettersArray.push(letter);
+      }
+    });
+
+    classicLettersArray = shuffleArray(classicLettersArray);
+    const fixedLetters = classicLettersArray.slice(0, N_fixed);
+
+    let vowelsInFixed = 0;
+    let consonantsInFixed = 0;
+    const fixedCounts = {};
+    fixedLetters.forEach(letter => {
+      fixedCounts[letter] = (fixedCounts[letter] || 0) + 1;
+      if (VOWELS_SET.has(letter)) {
+        vowelsInFixed++;
+      } else {
+        consonantsInFixed++;
+      }
+    });
+
+    const V_random = Math.max(0, V_target - vowelsInFixed);
+    const C_random = Math.max(0, C_target - consonantsInFixed);
+
+    // 2. Generate random portion
+    const randomCounts = {};
+    for (let i = 0; i < V_random; i++) {
+      const letter = pickWeightedRandom(VOWELS, classicCounts);
+      randomCounts[letter] = (randomCounts[letter] || 0) + 1;
+    }
+    for (let i = 0; i < C_random; i++) {
+      const letter = pickWeightedRandom(CONSONANTS, classicCounts);
+      randomCounts[letter] = (randomCounts[letter] || 0) + 1;
+    }
+
+    // 3. Combine
+    const candidateCounts = {};
+    for (const letter of [...VOWELS, ...CONSONANTS]) {
+      candidateCounts[letter] = (fixedCounts[letter] || 0) + (randomCounts[letter] || 0);
+    }
+
+    // 4. Validate
+    if ((candidateCounts['E'] || 0) < minELimit) continue;
+    if ((candidateCounts['E'] || 0) > maxLetterLimit) continue;
+
+    let validCaps = true;
+    for (const [letter, qty] of Object.entries(candidateCounts)) {
+      if (qty > maxLetterLimit) {
+        validCaps = false;
+        break;
+      }
+    }
+    if (!validCaps) continue;
+
+    const powerTilesCount = (candidateCounts['Z'] || 0) + (candidateCounts['Q'] || 0) + (candidateCounts['X'] || 0) + (candidateCounts['J'] || 0);
+    if (powerTilesCount > maxPowerTilesLimit) continue;
+
+    const totalScore = Object.entries(candidateCounts).reduce((sum, [letter, qty]) => sum + qty * (TILE_SCORES[letter] || 0), 0);
+    if (totalScore < minPoints || totalScore > maxPoints) continue;
+
+    // Successful attempt
+    bestBag = candidateCounts;
+    break;
+  }
+
+  // Fallback
+  if (!bestBag) {
+    bestBag = classicCounts;
+  }
+
+  return bestBag;
+};
+
 // --- EVEN TILE DISTRIBUTION ALGORITHM ---
 const generateEvenDecks = (gridSize, numPlayers = 2, config = {}) => {
   const size = Number(gridSize);
@@ -99,6 +239,77 @@ const generateEvenDecks = (gridSize, numPlayers = 2, config = {}) => {
       decks[index % numPlayers].push(makeItem(item));
     });
   };
+
+  const randomizeBagLetters = config.randomizeBagLetters !== undefined ? config.randomizeBagLetters : 0;
+  if (randomizeBagLetters > 0) {
+    // 1. Blanks Allocation
+    const blanks = Array.from({ length: blankTilesCount * numPlayers }, () => '_');
+    dealToDecks(blanks, letter => ({ id: Math.random().toString(), letter, score: 0 }));
+
+    // 2. Generate and allocate randomized pool
+    const randomizedLettersPool = generateRandomizedLetterPool(size, numPlayers, randomizeBagLetters);
+
+    let evenDecks = Array.from({ length: numPlayers }, () => []);
+    let randomPool = [];
+    const F = distributionShuffling / 100.0;
+
+    Object.entries(randomizedLettersPool).forEach(([letter, qty]) => {
+      const qRand = Math.round(qty * F);
+      const qEven = qty - qRand;
+      
+      const perPlayer = Math.floor(qEven / numPlayers);
+      const remainder = qEven % numPlayers;
+      
+      for (let p = 0; p < numPlayers; p++) {
+        for (let i = 0; i < perPlayer; i++) {
+          evenDecks[p].push(letter);
+        }
+      }
+      for (let i = 0; i < remainder; i++) {
+        randomPool.push(letter);
+      }
+      for (let i = 0; i < qRand; i++) {
+        randomPool.push(letter);
+      }
+    });
+
+    if (config.communityBagEnabled) {
+      evenDecks.forEach((playerStandards, pIdx) => {
+        playerStandards.forEach(letter => {
+          decks[pIdx].push({ id: Math.random().toString(), letter, score: getTileScore(letter) });
+        });
+      });
+
+      const communityEvenPools = {};
+      decks.forEach((deck, idx) => {
+        communityEvenPools[idx] = shuffleArray(deck);
+      });
+
+      return {
+        communityDeck: {
+          sharedRandomPool: shuffleArray(randomPool.map(letter => ({ id: Math.random().toString(), letter, score: getTileScore(letter) }))),
+          evenPools: communityEvenPools
+        }
+      };
+    } else {
+      randomPool = shuffleArray(randomPool);
+      randomPool.forEach((letter, index) => {
+        evenDecks[index % numPlayers].push(letter);
+      });
+
+      evenDecks.forEach((playerStandards, pIdx) => {
+        playerStandards.forEach(letter => {
+          decks[pIdx].push({ id: Math.random().toString(), letter, score: getTileScore(letter) });
+        });
+      });
+
+      const resultDecks = {};
+      decks.forEach((deck, idx) => {
+        resultDecks[`deck${idx + 1}`] = shuffleArray(deck);
+      });
+      return resultDecks;
+    }
+  }
 
   // 1. Specials Allocation
   if (numPlayers === 2 && qzjxSetting === 'paired') {
@@ -370,6 +581,7 @@ export default function App() {
   const [blankTilesScored, setBlankTilesScored] = useState(false);
   const [communityBagEnabled, setCommunityBagEnabled] = useState(false);
   const [qzjxSetting, setQzjxSetting] = useState('random2');
+  const [randomizeBagLetters, setRandomizeBagLetters] = useState(0);
 
   useEffect(() => {
     setBlankTilesCount(selectedGridSize === 15 ? 1 : (selectedGridSize === 17 ? 2 : 3));
@@ -733,6 +945,7 @@ export default function App() {
       blankTilesScored: !!config.blankTilesScored,
       communityBagEnabled: !!config.communityBagEnabled,
       qzjxSetting: config.qzjxSetting || 'random2',
+      randomizeBagLetters: config.randomizeBagLetters !== undefined ? config.randomizeBagLetters : 0,
       diagonalAllowed: config.diagonalAllowed,
       backwardsAllowed: config.backwardsAllowed,
       diagonalBackwardsAllowed: config.diagonalBackwardsAllowed,
@@ -818,7 +1031,8 @@ export default function App() {
           const decks = generateEvenDecks(data.gridSize, maxPlayers, {
             distributionShuffling: data.distributionShuffling,
             blankTilesCount: data.blankTilesCount,
-            qzjxSetting: data.qzjxSetting
+            qzjxSetting: data.qzjxSetting,
+            randomizeBagLetters: data.randomizeBagLetters || 0
           });
           const myDeckKey = `deck${currentCount + 1}`;
           myDeck = decks[myDeckKey] || [];
@@ -3016,6 +3230,86 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Randomize Bag Letters setting */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${
+                      isDark ? 'text-slate-400' : 'text-slate-500'
+                    }`}>Randomize Bag Letters</label>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                      isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'
+                    }`}>
+                      {randomizeBagLetters}% {
+                        randomizeBagLetters === 0 ? 'Classic' : 
+                        randomizeBagLetters === 40 ? 'Balanced Chaos' : 
+                        randomizeBagLetters === 90 ? 'Wild Mode' : 
+                        randomizeBagLetters < 40 ? 'Semi-Random' : 'Chaos'
+                      }
+                    </span>
+                  </div>
+                  <div className={`p-4 rounded-xl border space-y-3 transition-colors ${
+                    isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={randomizeBagLetters}
+                      onChange={(e) => setRandomizeBagLetters(parseInt(e.target.value, 10))}
+                      className="w-full accent-slate-500 h-2 bg-slate-700 rounded-lg cursor-pointer appearance-none animate-none"
+                    />
+                    
+                    {/* Presets Grid */}
+                    <div className="grid grid-cols-3 gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setRandomizeBagLetters(0)}
+                        className={`py-1 px-2 rounded-lg border text-[10px] font-extrabold transition-colors ${
+                          randomizeBagLetters === 0
+                            ? isDark ? 'bg-slate-700 border-slate-500 text-white' : 'bg-slate-200 border-slate-400 text-slate-800'
+                            : isDark ? 'bg-slate-800/40 border-slate-750 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'
+                        }`}
+                      >
+                        Classic (0%)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRandomizeBagLetters(40)}
+                        className={`py-1 px-2 rounded-lg border text-[10px] font-extrabold transition-colors ${
+                          randomizeBagLetters === 40
+                            ? isDark ? 'bg-slate-700 border-slate-500 text-white' : 'bg-slate-200 border-slate-400 text-slate-800'
+                            : isDark ? 'bg-slate-800/40 border-slate-750 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'
+                        }`}
+                      >
+                        Balanced (40%)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRandomizeBagLetters(90)}
+                        className={`py-1 px-2 rounded-lg border text-[10px] font-extrabold transition-colors ${
+                          randomizeBagLetters === 90
+                            ? isDark ? 'bg-slate-700 border-slate-500 text-white' : 'bg-slate-200 border-slate-400 text-slate-800'
+                            : isDark ? 'bg-slate-800/40 border-slate-750 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'
+                        }`}
+                      >
+                        Wild (90%)
+                      </button>
+                    </div>
+
+                    <p className={`text-[11px] leading-relaxed transition-all duration-300 ${
+                      isDark ? 'text-slate-400' : 'text-slate-500'
+                    }`}>
+                      {randomizeBagLetters === 0 && "Exact Scrabble bag. Fair + predictable. Best for tournaments."}
+                      {randomizeBagLetters === 40 && "Same vowel/consonant ratio + point total every game. But which letters show up changes. Your racks stay fair, board feels fresh."}
+                      {randomizeBagLetters === 90 && "Vowels guaranteed, everything else random. Some games have 5 Z's. Some have none. High risk, high reward."}
+                      {randomizeBagLetters !== 0 && randomizeBagLetters !== 40 && randomizeBagLetters !== 90 && (
+                        `Chaos level at ${randomizeBagLetters}%. Blends classic bag counts with randomized, weighted letter generation.`
+                      )}
+                    </p>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${
                     isDark ? 'text-slate-400' : 'text-slate-500'
@@ -3062,6 +3356,7 @@ export default function App() {
                     blankTilesScored,
                     communityBagEnabled,
                     qzjxSetting,
+                    randomizeBagLetters,
                     handicapEnabled,
                     handicaps: [handicapP1, handicapP2, handicapP3]
                   })}
@@ -3990,6 +4285,13 @@ export default function App() {
                     <span className="text-slate-400 block">QZ / JX Specials:</span>
                     <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>
                       {roomData.qzjxSetting === 'paired' ? 'Paired' : roomData.qzjxSetting === 'halved' ? 'Balanced' : roomData.qzjxSetting === 'samed' ? 'Identical' : 'Random'}
+                    </span>
+                  </div>
+                  <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
+                    <span className="text-slate-400 block">Bag Randomness:</span>
+                    <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>
+                      {roomData.randomizeBagLetters !== undefined ? roomData.randomizeBagLetters : 0}% 
+                      ({(roomData.randomizeBagLetters || 0) === 0 ? 'Fixed' : (roomData.randomizeBagLetters || 0) <= 40 ? 'Semi-Random' : 'Wild'})
                     </span>
                   </div>
                 </div>
