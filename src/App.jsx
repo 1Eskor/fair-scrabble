@@ -51,39 +51,29 @@ const shuffleArray = (array) => {
 };
 
 // --- EVEN TILE DISTRIBUTION ALGORITHM ---
-const generateEvenDecks = (gridSize, numPlayers = 2, evenDistributionMode = false) => {
+const generateEvenDecks = (gridSize, numPlayers = 2, config = {}) => {
   const size = Number(gridSize);
-  let playerSpecials = []; 
-  let playerBlanksCount = 0;
+  const distributionShuffling = config.distributionShuffling !== undefined ? config.distributionShuffling : (config.evenDistributionMode ? 0 : 100);
+  const blankTilesCount = config.blankTilesCount !== undefined ? config.blankTilesCount : (size === 15 ? 1 : (size === 17 ? 2 : 3));
+  const qzjxSetting = config.qzjxSetting || 'random2';
+
   let playerSCount = 0;
   let standardLettersPool = {};
 
   if (size === 15) {
-    // 100 tiles total
-    playerSpecials = ['Z', 'Q', 'X', 'J'];
-    playerBlanksCount = 2;
-    playerSCount = 4;
+    playerSCount = 2; // S count per player (4 total for 2 players)
     standardLettersPool = {
       A: 9, B: 2, C: 2, D: 4, E: 12, F: 2, G: 3, H: 2, I: 9, K: 1, L: 4, M: 2,
       N: 6, O: 8, P: 2, R: 6, T: 6, U: 4, V: 2, W: 2, Y: 2
     };
   } else if (size === 17) {
-    // 146 tiles total (20 specials/blanks/S + 126 standards)
-    playerSpecials = ['Z', 'Q', 'X', 'J', 'Z', 'Q', 'X', 'J'];
-    playerBlanksCount = 4; 
-    playerSCount = 8; 
+    playerSCount = 4; // S count per player (8 total for 2 players)
     standardLettersPool = {
       A: 12, B: 3, C: 3, D: 5, E: 15, F: 3, G: 4, H: 3, I: 12, K: 2, L: 5, M: 3,
       N: 8, O: 11, P: 3, R: 8, T: 8, U: 6, V: 3, W: 3, Y: 3
     };
   } else {
-    // 19x19 Grid: 180 tiles total (34 specials/blanks/S + 146 standards)
-    playerSpecials = [
-      'Z', 'Q', 'X', 'J', 'Z', 'Q', 'X', 'J',
-      'Z', 'Q', 'X', 'J', 'Z', 'Q', 'X', 'J'
-    ];
-    playerBlanksCount = 6; 
-    playerSCount = 12; 
+    playerSCount = 6; // S count per player (12 total for 2 players)
     standardLettersPool = {
       A: 14, B: 4, C: 4, D: 6, E: 17, F: 4, G: 5, H: 4, I: 14, K: 2, L: 6, M: 4,
       N: 9, O: 12, P: 4, R: 9, T: 9, U: 7, V: 4, W: 4, Y: 4
@@ -91,26 +81,8 @@ const generateEvenDecks = (gridSize, numPlayers = 2, evenDistributionMode = fals
   }
 
   if (numPlayers === 3) {
-    playerBlanksCount = 3; // 1 blank per player
-    playerSCount = 3; // 1 S per player
-    const pool = ['Q', 'Z', 'J', 'X'];
-    // Give exactly 6 random specials total (2 per player)
-    playerSpecials = [
-      ...pool,
-      pool[Math.floor(Math.random() * pool.length)],
-      pool[Math.floor(Math.random() * pool.length)]
-    ];
+    playerSCount = 1; // S count per player (3 total)
   }
-
-  const shuffledSpecials = shuffleArray(playerSpecials);
-
-  const decks = Array.from({ length: numPlayers }, () => []);
-
-  const dealToDecks = (items, makeItem) => {
-    items.forEach((item, index) => {
-      decks[index % numPlayers].push(makeItem(item));
-    });
-  };
 
   const getTileScore = (letter) => {
     if (numPlayers === 3) {
@@ -120,45 +92,142 @@ const generateEvenDecks = (gridSize, numPlayers = 2, evenDistributionMode = fals
     return TILE_SCORES[letter] || 0;
   };
 
-  dealToDecks(shuffledSpecials, letter => ({ id: Math.random().toString(), letter, score: getTileScore(letter) }));
-  
-  const blanks = Array.from({ length: playerBlanksCount }, () => '_');
-  dealToDecks(blanks, letter => ({ id: Math.random().toString(), letter, score: 0 }));
+  const decks = Array.from({ length: numPlayers }, () => []);
 
-  const esses = Array.from({ length: playerSCount }, () => 'S');
-  dealToDecks(esses, letter => ({ id: Math.random().toString(), letter, score: 1 }));
-
-  if (evenDistributionMode) {
-    let remainderPool = [];
-    Object.entries(standardLettersPool).forEach(([letter, qty]) => {
-      const perPlayer = Math.floor(qty / numPlayers);
-      const remainder = qty % numPlayers;
-      
-      for (let i = 0; i < perPlayer * numPlayers; i++) {
-        decks[i % numPlayers].push({ id: Math.random().toString(), letter, score: getTileScore(letter) });
-      }
-      for (let i = 0; i < remainder; i++) {
-        remainderPool.push(letter);
-      }
+  const dealToDecks = (items, makeItem) => {
+    items.forEach((item, index) => {
+      decks[index % numPlayers].push(makeItem(item));
     });
-    remainderPool = shuffleArray(remainderPool);
-    dealToDecks(remainderPool, letter => ({ id: Math.random().toString(), letter, score: getTileScore(letter) }));
+  };
+
+  // 1. Specials Allocation
+  if (numPlayers === 2 && qzjxSetting === 'paired') {
+    const rand = Math.random() < 0.5;
+    const set1 = ['Q', 'X'];
+    const set2 = ['Z', 'J'];
+    const p1Letters = [];
+    const p2Letters = [];
+    const repeat = size === 15 ? 1 : (size === 17 ? 2 : 4);
+    for (let r = 0; r < repeat; r++) {
+      p1Letters.push(...(rand ? set1 : set2));
+      p2Letters.push(...(rand ? set2 : set1));
+    }
+    p1Letters.forEach(letter => decks[0].push({ id: Math.random().toString(), letter, score: getTileScore(letter) }));
+    p2Letters.forEach(letter => decks[1].push({ id: Math.random().toString(), letter, score: getTileScore(letter) }));
+  } else if (numPlayers === 2 && qzjxSetting === 'halved') {
+    const repeat = size === 15 ? 1 : (size === 17 ? 2 : 4);
+    for (let r = 0; r < repeat; r++) {
+      const g1 = shuffleArray(['Q', 'Z']);
+      const g2 = shuffleArray(['J', 'X']);
+      decks[0].push({ id: Math.random().toString(), letter: g1[0], score: getTileScore(g1[0]) });
+      decks[0].push({ id: Math.random().toString(), letter: g2[0], score: getTileScore(g2[0]) });
+      decks[1].push({ id: Math.random().toString(), letter: g1[1], score: getTileScore(g1[1]) });
+      decks[1].push({ id: Math.random().toString(), letter: g2[1], score: getTileScore(g2[1]) });
+    }
+  } else if (numPlayers === 2 && qzjxSetting === 'samed') {
+    const pool = ['Q', 'Z', 'J', 'X'];
+    const repeat = size === 15 ? 2 : (size === 17 ? 4 : 8);
+    const chosen = [];
+    for (let i = 0; i < repeat; i++) {
+      chosen.push(pool[Math.floor(Math.random() * pool.length)]);
+    }
+    chosen.forEach(letter => {
+      decks[0].push({ id: Math.random().toString(), letter, score: getTileScore(letter) });
+      decks[1].push({ id: Math.random().toString(), letter, score: getTileScore(letter) });
+    });
   } else {
-    let standards = [];
-    Object.entries(standardLettersPool).forEach(([letter, qty]) => {
-      for (let i = 0; i < qty; i++) {
-        standards.push(letter);
-      }
-    });
-    standards = shuffleArray(standards);
-    dealToDecks(standards, letter => ({ id: Math.random().toString(), letter, score: getTileScore(letter) }));
+    let specialsPool = [];
+    if (size === 15) {
+      specialsPool = ['Z', 'Q', 'X', 'J'];
+    } else if (size === 17) {
+      specialsPool = ['Z', 'Q', 'X', 'J', 'Z', 'Q', 'X', 'J'];
+    } else {
+      specialsPool = [
+        'Z', 'Q', 'X', 'J', 'Z', 'Q', 'X', 'J',
+        'Z', 'Q', 'X', 'J', 'Z', 'Q', 'X', 'J'
+      ];
+    }
+    if (numPlayers === 3) {
+      const pool = ['Q', 'Z', 'J', 'X'];
+      specialsPool = [
+        ...pool,
+        pool[Math.floor(Math.random() * pool.length)],
+        pool[Math.floor(Math.random() * pool.length)]
+      ];
+    }
+    const shuffledSpecials = shuffleArray(specialsPool);
+    dealToDecks(shuffledSpecials, letter => ({ id: Math.random().toString(), letter, score: getTileScore(letter) }));
   }
 
-  const resultDecks = {};
-  decks.forEach((deck, idx) => {
-    resultDecks[`deck${idx + 1}`] = shuffleArray(deck);
+  // 2. Blanks Allocation
+  const blanks = Array.from({ length: blankTilesCount * numPlayers }, () => '_');
+  dealToDecks(blanks, letter => ({ id: Math.random().toString(), letter, score: 0 }));
+
+  // 3. Esses (S) Allocation
+  const esses = Array.from({ length: playerSCount * numPlayers }, () => 'S');
+  dealToDecks(esses, letter => ({ id: Math.random().toString(), letter, score: 1 }));
+
+  // 4. Standards
+  let evenDecks = Array.from({ length: numPlayers }, () => []);
+  let randomPool = [];
+  const F = distributionShuffling / 100.0;
+
+  Object.entries(standardLettersPool).forEach(([letter, qty]) => {
+    const qRand = Math.round(qty * F);
+    const qEven = qty - qRand;
+    
+    const perPlayer = Math.floor(qEven / numPlayers);
+    const remainder = qEven % numPlayers;
+    
+    for (let p = 0; p < numPlayers; p++) {
+      for (let i = 0; i < perPlayer; i++) {
+        evenDecks[p].push(letter);
+      }
+    }
+    for (let i = 0; i < remainder; i++) {
+      randomPool.push(letter);
+    }
+    for (let i = 0; i < qRand; i++) {
+      randomPool.push(letter);
+    }
   });
-  return resultDecks;
+
+  if (config.communityBagEnabled) {
+    evenDecks.forEach((playerStandards, pIdx) => {
+      playerStandards.forEach(letter => {
+        decks[pIdx].push({ id: Math.random().toString(), letter, score: getTileScore(letter) });
+      });
+    });
+
+    const communityEvenPools = {};
+    decks.forEach((deck, idx) => {
+      communityEvenPools[idx] = shuffleArray(deck);
+    });
+
+    return {
+      communityDeck: {
+        sharedRandomPool: shuffleArray(randomPool.map(letter => ({ id: Math.random().toString(), letter, score: getTileScore(letter) }))),
+        evenPools: communityEvenPools
+      }
+    };
+  } else {
+    randomPool = shuffleArray(randomPool);
+    randomPool.forEach((letter, index) => {
+      evenDecks[index % numPlayers].push(letter);
+    });
+
+    evenDecks.forEach((playerStandards, pIdx) => {
+      playerStandards.forEach(letter => {
+        decks[pIdx].push({ id: Math.random().toString(), letter, score: getTileScore(letter) });
+      });
+    });
+
+    const resultDecks = {};
+    decks.forEach((deck, idx) => {
+      resultDecks[`deck${idx + 1}`] = shuffleArray(deck);
+    });
+    return resultDecks;
+  }
 };
 
 // --- SYMMETRICAL BOARD BONUS CONFIGURATION ---
@@ -219,6 +288,18 @@ const getBonus = (r, c, size) => {
     if (x === 8 && y === 8) return 'DL';
     return null;
   }
+};
+
+const getCommunityBagSize = (communityDeck) => {
+  if (!communityDeck) return 0;
+  const sharedSize = (communityDeck.sharedRandomPool || []).length;
+  let evenSize = 0;
+  if (communityDeck.evenPools) {
+    Object.values(communityDeck.evenPools).forEach(pool => {
+      evenSize += (pool || []).length;
+    });
+  }
+  return sharedSize + evenSize;
 };
 
 export default function App() {
@@ -284,7 +365,15 @@ export default function App() {
   const [timerEnabled, setTimerEnabled] = useState(false);
   const [timerDuration, setTimerDuration] = useState(90);
   const [threePlayerMode, setThreePlayerMode] = useState(false);
-  const [evenDistributionMode, setEvenDistributionMode] = useState(false);
+  const [distributionShuffling, setDistributionShuffling] = useState(0);
+  const [blankTilesCount, setBlankTilesCount] = useState(1);
+  const [blankTilesScored, setBlankTilesScored] = useState(false);
+  const [communityBagEnabled, setCommunityBagEnabled] = useState(false);
+  const [qzjxSetting, setQzjxSetting] = useState('random2');
+
+  useEffect(() => {
+    setBlankTilesCount(selectedGridSize === 15 ? 1 : (selectedGridSize === 17 ? 2 : 3));
+  }, [selectedGridSize]);
   const [joinInput, setJoinInput] = useState('');
   const [handicapEnabled, setHandicapEnabled] = useState(false);
   const [handicapP1, setHandicapP1] = useState(0);
@@ -369,6 +458,69 @@ export default function App() {
     if (tileOutlineMode !== 'custom') return defaultColor;
     const rule = customOutlines.find(r => r.types.includes(type));
     return rule ? rule.color : defaultColor;
+  };
+
+  const getTileScore = (tile, room) => {
+    if (!tile) return 0;
+    if (tile.isBlank) {
+      return room?.blankTilesScored ? (TILE_SCORES[tile.letter] || 0) : 0;
+    }
+    return tile.score !== undefined ? tile.score : (TILE_SCORES[tile.letter] || 0);
+  };
+
+  const drawTilesForPlayer = (room, uid, count) => {
+    const drawn = [];
+    const updates = {};
+    const playerIndex = room.playerOrder.indexOf(uid);
+
+    if (room.communityBagEnabled) {
+      const community = { ...room.communityDeck };
+      const shared = [...(community.sharedRandomPool || [])];
+      const evenPools = community.evenPools ? { ...community.evenPools } : {};
+      const myEvenPool = evenPools[playerIndex] ? [...evenPools[playerIndex]] : [];
+
+      const F = (room.distributionShuffling !== undefined ? room.distributionShuffling : (room.evenDistributionMode ? 0 : 100)) / 100.0;
+
+      for (let i = 0; i < count; i++) {
+        if (shared.length === 0 && myEvenPool.length === 0) {
+          break;
+        }
+
+        let drawFromShared = false;
+        if (shared.length > 0 && myEvenPool.length > 0) {
+          drawFromShared = Math.random() < F;
+        } else if (shared.length > 0) {
+          drawFromShared = true;
+        } else {
+          drawFromShared = false;
+        }
+
+        if (drawFromShared) {
+          drawn.push(shared.shift());
+        } else {
+          drawn.push(myEvenPool.shift());
+        }
+      }
+
+      evenPools[playerIndex] = myEvenPool;
+      updates['communityDeck'] = {
+        sharedRandomPool: shared,
+        evenPools: evenPools
+      };
+    } else {
+      const p = room.players[uid];
+      if (p && p.deck) {
+        const deck = [...p.deck];
+        for (let i = 0; i < count; i++) {
+          if (deck.length > 0) {
+            drawn.push(deck.shift());
+          }
+        }
+        updates[`players.${uid}.deck`] = deck;
+      }
+    }
+
+    return { drawn, updates };
   };
 
   // Custom Dictionary Tool state
@@ -567,7 +719,7 @@ export default function App() {
     const newRoomId = Math.floor(1000 + Math.random() * 9000).toString();
     
     const maxPlayers = config.threePlayerMode ? 3 : 2;
-    const decks = generateEvenDecks(gridSize, maxPlayers, config.evenDistributionMode);
+    const decksResult = generateEvenDecks(gridSize, maxPlayers, config);
 
     const rackSize = gridSize === 15 ? 7 : (gridSize === 17 ? 8 : 9);
 
@@ -576,7 +728,11 @@ export default function App() {
       gridSize,
       rackSize,
       maxPlayers,
-      evenDistributionMode: !!config.evenDistributionMode,
+      distributionShuffling: config.distributionShuffling !== undefined ? config.distributionShuffling : 0,
+      blankTilesCount: config.blankTilesCount !== undefined ? config.blankTilesCount : (gridSize === 15 ? 1 : (gridSize === 17 ? 2 : 3)),
+      blankTilesScored: !!config.blankTilesScored,
+      communityBagEnabled: !!config.communityBagEnabled,
+      qzjxSetting: config.qzjxSetting || 'random2',
       diagonalAllowed: config.diagonalAllowed,
       backwardsAllowed: config.backwardsAllowed,
       diagonalBackwardsAllowed: config.diagonalBackwardsAllowed,
@@ -587,12 +743,13 @@ export default function App() {
       status: 'waiting',
       handicapEnabled: !!config.handicapEnabled,
       handicaps: config.handicapEnabled ? config.handicaps : [0, 0, 0],
+      communityDeck: config.communityBagEnabled ? decksResult.communityDeck : null,
       players: {
         [user.uid]: {
           uid: user.uid,
           name: username,
           score: config.handicapEnabled ? (config.handicaps?.[0] || 0) : 0,
-          deck: decks.deck1,
+          deck: config.communityBagEnabled ? [] : decksResult.deck1,
           rack: [],
           isReady: false,
           lastActive: Date.now()
@@ -656,9 +813,16 @@ export default function App() {
         }
 
         // Get the appropriate deck
-        const decks = generateEvenDecks(data.gridSize, maxPlayers, data.evenDistributionMode);
-        const myDeckKey = `deck${currentCount + 1}`;
-        const myDeck = decks[myDeckKey];
+        let myDeck = [];
+        if (!data.communityBagEnabled) {
+          const decks = generateEvenDecks(data.gridSize, maxPlayers, {
+            distributionShuffling: data.distributionShuffling,
+            blankTilesCount: data.blankTilesCount,
+            qzjxSetting: data.qzjxSetting
+          });
+          const myDeckKey = `deck${currentCount + 1}`;
+          myDeck = decks[myDeckKey] || [];
+        }
 
         const initialScore = (data.handicapEnabled && data.handicaps) ? (data.handicaps[currentCount] || 0) : 0;
 
@@ -702,22 +866,29 @@ export default function App() {
       const rackSize = data.rackSize;
 
       // Draw initial racks for all players
+      let currentCommunity = data.communityBagEnabled ? { ...data.communityDeck } : null;
       updatedOrder.forEach(uid => {
         const p = finalPlayers[uid];
         if (p.rack.length === 0) {
-          const freshDeck = [...p.deck];
-          const newRack = [];
-          for (let i = 0; i < rackSize; i++) {
-            if (freshDeck.length > 0) {
-              newRack.push(freshDeck.shift());
+          if (data.communityBagEnabled) {
+            const { drawn, updates } = drawTilesForPlayer({ ...data, communityDeck: currentCommunity }, uid, rackSize);
+            p.rack = drawn;
+            currentCommunity = updates.communityDeck;
+          } else {
+            const freshDeck = [...p.deck];
+            const newRack = [];
+            for (let i = 0; i < rackSize; i++) {
+              if (freshDeck.length > 0) {
+                newRack.push(freshDeck.shift());
+              }
             }
+            p.deck = freshDeck;
+            p.rack = newRack;
           }
-          p.deck = freshDeck;
-          p.rack = newRack;
         }
       });
 
-      await updateDoc(roomRef, {
+      const finalUpdateObj = {
         players: finalPlayers,
         playerOrder: updatedOrder,
         status: 'playing',
@@ -728,10 +899,15 @@ export default function App() {
             id: Math.random().toString(),
             timestamp: Date.now(),
             type: 'system',
-            message: `${username} joined. Tiles distributed evenly! Game started.`
+            message: `${username} joined. Game started!`
           }
         ]
-      });
+      };
+      if (data.communityBagEnabled) {
+        finalUpdateObj.communityDeck = currentCommunity;
+      }
+
+      await updateDoc(roomRef, finalUpdateObj);
 
       localStorage.setItem('active_room_id', cleanId);
       setRoomId(cleanId);
@@ -1228,7 +1404,7 @@ export default function App() {
           let wordMultiplier = 1;
 
           wordCells.forEach(wc => {
-            const val = wc.tile.isBlank ? 0 : (wc.tile.score !== undefined ? wc.tile.score : (TILE_SCORES[wc.tile.letter] || 0));
+            const val = getTileScore(wc.tile, roomData);
             if (wc.isNew) {
               const bonus = getBonus(wc.r, wc.c, roomData.gridSize);
               if (bonus === 'DL') score += val * 2;
@@ -1447,7 +1623,9 @@ export default function App() {
     Object.entries(updated).forEach(([uid, player]) => {
       let deduction = 0;
       player.rack.forEach(tile => {
-        deduction += tile.score;
+        if (!tile.isBlank && tile.letter !== '_') {
+          deduction += tile.score;
+        }
       });
       player.score -= deduction;
       
@@ -1494,7 +1672,11 @@ export default function App() {
         const origPlayer = currentPlayers[p.uid];
         const origScore = origPlayer.score;
         let unplayedSum = 0;
-        origPlayer.rack.forEach(t => unplayedSum += t.score);
+        origPlayer.rack.forEach(t => {
+          if (!t.isBlank && t.letter !== '_') {
+            unplayedSum += t.score;
+          }
+        });
         
         let line = `${idx + 1}. ${p.name}: ${p.score} pts (started with ${origScore} pts`;
         if (unplayedSum > 0) {
@@ -1574,13 +1756,10 @@ export default function App() {
       };
     });
 
-    // Refill rack from player's private balanced deck
+    // Refill rack using drawTilesForPlayer
     const needed = roomData.rackSize - updatedRack.length;
-    for (let i = 0; i < needed; i++) {
-      if (myDeck.length > 0) {
-        updatedRack.push(myDeck.shift());
-      }
-    }
+    const { drawn, updates: drawUpdates } = drawTilesForPlayer(roomData, user.uid, needed);
+    const finalRack = [...updatedRack, ...drawn];
 
     // Toggle turn cyclically
     const currentIndex = roomData.playerOrder.indexOf(user.uid);
@@ -1609,9 +1788,11 @@ export default function App() {
     updatedPlayers[user.uid] = {
       ...myPlayer,
       score: finalScore,
-      rack: updatedRack,
-      deck: myDeck
+      rack: finalRack
     };
+    if (!roomData.communityBagEnabled) {
+      updatedPlayers[user.uid].deck = drawUpdates[`players.${user.uid}.deck`] || [];
+    }
 
     // Prepare History action (structured for scorecard)
     const historyItem = {
@@ -1625,7 +1806,11 @@ export default function App() {
       points: turnPoints
     };
 
-    const isGameOver = updatedRack.length === 0 && myDeck.length === 0;
+    const isGameOver = finalRack.length === 0 && (
+      roomData.communityBagEnabled
+        ? getCommunityBagSize(drawUpdates.communityDeck || roomData.communityDeck) === 0
+        : (updatedPlayers[user.uid].deck || []).length === 0
+    );
 
     let finalUpdateObj = {
       board: updatedBoard,
@@ -1636,6 +1821,9 @@ export default function App() {
       turnIndex: roomData.turnIndex + 1,
       consecutiveZeroTurns: 0
     };
+    if (roomData.communityBagEnabled) {
+      finalUpdateObj.communityDeck = drawUpdates.communityDeck;
+    }
 
     if (isGameOver) {
       const { players: finalPlayers, detailsStr, scorecardStr } = calculateEndgame(updatedPlayers, user.uid, true, [...roomData.history, historyItem]);
@@ -1702,13 +1890,10 @@ export default function App() {
             };
           });
 
-          // Refill rack from player's private balanced deck
+          // Refill rack using drawTilesForPlayer
           const needed = roomData.rackSize - updatedRack.length;
-          for (let i = 0; i < needed; i++) {
-            if (myDeck.length > 0) {
-              updatedRack.push(myDeck.shift());
-            }
-          }
+          const { drawn, updates: drawUpdates } = drawTilesForPlayer(roomData, user.uid, needed);
+          const finalRack = [...updatedRack, ...drawn];
 
           // Toggle turn cyclically
           const currentIndex = roomData.playerOrder.indexOf(user.uid);
@@ -1737,9 +1922,11 @@ export default function App() {
           updatedPlayers[user.uid] = {
             ...myPlayer,
             score: finalScore,
-            rack: updatedRack,
-            deck: myDeck
+            rack: finalRack
           };
+          if (!roomData.communityBagEnabled) {
+            updatedPlayers[user.uid].deck = drawUpdates[`players.${user.uid}.deck`] || [];
+          }
 
           // Prepare History action (structured for scorecard)
           const historyItem = {
@@ -1753,7 +1940,11 @@ export default function App() {
             points: turnPoints
           };
 
-          const isGameOver = updatedRack.length === 0 && myDeck.length === 0;
+          const isGameOver = finalRack.length === 0 && (
+            roomData.communityBagEnabled
+              ? getCommunityBagSize(drawUpdates.communityDeck || roomData.communityDeck) === 0
+              : (updatedPlayers[user.uid].deck || []).length === 0
+          );
 
           let finalUpdateObj = {
             board: updatedBoard,
@@ -1764,6 +1955,9 @@ export default function App() {
             turnIndex: roomData.turnIndex + 1,
             consecutiveZeroTurns: 0
           };
+          if (roomData.communityBagEnabled) {
+            finalUpdateObj.communityDeck = drawUpdates.communityDeck;
+          }
 
           if (isGameOver) {
             const { players: finalPlayers, detailsStr, scorecardStr } = calculateEndgame(updatedPlayers, user.uid, true, [...roomData.history, historyItem]);
@@ -1934,22 +2128,48 @@ export default function App() {
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
     const myPlayer = roomData.players[user.uid];
     const myRack = [...myPlayer.rack];
-    const myDeck = [...myPlayer.deck];
 
     // Separate exchanged tiles and remaining tiles
     const tilesToReturn = myRack.filter(t => selectedExchangeIds.includes(t.id));
     const keptRack = myRack.filter(t => !selectedExchangeIds.includes(t.id));
 
-    // Refill rack from deck first
-    const drawnRack = [...keptRack];
-    for (let i = 0; i < tilesToReturn.length; i++) {
-      if (myDeck.length > 0) {
-        drawnRack.push(myDeck.shift());
-      }
-    }
+    let finalRack = [...keptRack];
+    let finalUpdateObj = {};
+    const updatedPlayers = { ...roomData.players };
 
-    // Now return old tiles to the private deck and shuffle
-    const updatedDeck = shuffleArray([...myDeck, ...tilesToReturn]);
+    if (roomData.communityBagEnabled) {
+      const { drawn, updates: drawUpdates } = drawTilesForPlayer(roomData, user.uid, tilesToReturn.length);
+      finalRack = [...keptRack, ...drawn];
+      
+      // Merge returned tiles back into sharedRandomPool and shuffle
+      const community = { ...drawUpdates.communityDeck };
+      const shared = shuffleArray([...(community.sharedRandomPool || []), ...tilesToReturn]);
+      
+      finalUpdateObj.communityDeck = {
+        ...community,
+        sharedRandomPool: shared
+      };
+      
+      updatedPlayers[user.uid] = {
+        ...myPlayer,
+        rack: finalRack
+      };
+    } else {
+      const myDeck = [...myPlayer.deck];
+      const drawnRack = [...keptRack];
+      for (let i = 0; i < tilesToReturn.length; i++) {
+        if (myDeck.length > 0) {
+          drawnRack.push(myDeck.shift());
+        }
+      }
+      const updatedDeck = shuffleArray([...myDeck, ...tilesToReturn]);
+      
+      updatedPlayers[user.uid] = {
+        ...myPlayer,
+        rack: drawnRack,
+        deck: updatedDeck
+      };
+    }
 
     const currentIndex = roomData.playerOrder.indexOf(user.uid);
     const nextPlayerId = roomData.playerOrder[(currentIndex + 1) % roomData.playerOrder.length] || user.uid;
@@ -1962,18 +2182,13 @@ export default function App() {
       playerUid: user.uid
     };
 
-    const updatedPlayers = { ...roomData.players };
-    updatedPlayers[user.uid] = {
-      ...myPlayer,
-      rack: drawnRack,
-      deck: updatedDeck
-    };
 
     const newConsecutiveZero = (roomData.consecutiveZeroTurns || 0) + 1;
     const maxPasses = (roomData.maxPlayers || 2) * 3;
     const isGameOver = newConsecutiveZero >= maxPasses;
 
-    let finalUpdateObj = {
+    finalUpdateObj = {
+      ...finalUpdateObj,
       players: updatedPlayers,
       activePlayerId: nextPlayerId,
       turnStartTime: Date.now(),
@@ -2117,8 +2332,36 @@ export default function App() {
   const remainingCounts = (() => {
     if (!roomData || !roomData.players) return {};
     const counts = {};
+
+    // Add tiles from community bag if enabled
+    if (roomData.communityBagEnabled && roomData.communityDeck) {
+      const comm = roomData.communityDeck;
+      if (comm.sharedRandomPool) {
+        comm.sharedRandomPool.forEach(t => {
+          let char = (t.letter || '').toUpperCase();
+          if (char === '_') char = '?';
+          if (char) {
+            counts[char] = (counts[char] || 0) + 1;
+          }
+        });
+      }
+      if (comm.evenPools) {
+        Object.values(comm.evenPools).forEach(pool => {
+          if (pool) {
+            pool.forEach(t => {
+              let char = (t.letter || '').toUpperCase();
+              if (char === '_') char = '?';
+              if (char) {
+                counts[char] = (counts[char] || 0) + 1;
+              }
+            });
+          }
+        });
+      }
+    }
+
     Object.values(roomData.players).forEach(p => {
-      if (p.deck) {
+      if (!roomData.communityBagEnabled && p.deck) {
         p.deck.forEach(t => {
           let char = (t.letter || '').toUpperCase();
           if (char === '_') char = '?';
@@ -2593,22 +2836,33 @@ export default function App() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${
-                    isDark ? 'text-slate-400' : 'text-slate-500'
-                  }`}>Tile Distribution</label>
-                  <div className={`flex items-center justify-between p-3 rounded-xl border transition-colors cursor-pointer ${
-                    isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-50 border-slate-200'
-                  }`} onClick={() => setEvenDistributionMode(!evenDistributionMode)}>
-                    <span className={`text-sm font-bold flex items-center gap-2 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-                      ⚖️ Even Distribution
+                  <div className="flex justify-between items-center">
+                    <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${
+                      isDark ? 'text-slate-400' : 'text-slate-500'
+                    }`}>Distribution/Shuffling</label>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                      isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'
+                    }`}>
+                      {distributionShuffling}% {distributionShuffling === 0 ? 'Even' : distributionShuffling === 100 ? 'Random' : 'Hybrid'}
                     </span>
+                  </div>
+                  <div className={`p-4 rounded-xl border transition-colors ${
+                    isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-50 border-slate-200'
+                  }`}>
                     <input
-                      type="checkbox"
-                      checked={evenDistributionMode}
-                      onChange={(e) => setEvenDistributionMode(e.target.checked)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="accent-slate-500 h-4 w-4"
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={distributionShuffling}
+                      onChange={(e) => setDistributionShuffling(parseInt(e.target.value, 10))}
+                      className="w-full accent-slate-500 h-2 bg-slate-700 rounded-lg cursor-pointer appearance-none animate-none"
                     />
+                    <p className={`text-[11px] mt-2 leading-relaxed ${
+                      isDark ? 'text-slate-400' : 'text-slate-500'
+                    }`}>
+                      Controls tile randomness. 0% is completely even (equal vowel/consonant distribution across players), 100% is completely random shuffling, and intermediate values blend the two approaches.
+                    </p>
                   </div>
                 </div>
 
@@ -2677,6 +2931,91 @@ export default function App() {
                   )}
                 </div>
 
+                {/* Blank Tiles Setting */}
+                <div className="space-y-2">
+                  <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${
+                    isDark ? 'text-slate-400' : 'text-slate-500'
+                  }`}>Blank Tiles</label>
+                  <div className={`p-4 rounded-xl border space-y-3 transition-colors ${
+                    isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Blank Tiles per Player:</span>
+                      <select
+                        value={blankTilesCount}
+                        onChange={(e) => setBlankTilesCount(parseInt(e.target.value, 10))}
+                        className={`text-sm rounded-lg p-1.5 border font-bold text-center w-20 ${
+                          isDark ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-850'
+                        }`}
+                      >
+                        {[...Array(11).keys()].map(n => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <label className="flex items-center justify-between pt-2 border-t border-slate-700/30 cursor-pointer">
+                      <span className="text-sm font-medium">Blanks count towards score</span>
+                      <input
+                        type="checkbox"
+                        checked={blankTilesScored}
+                        onChange={(e) => setBlankTilesScored(e.target.checked)}
+                        className="accent-slate-500 h-4 w-4"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Community Tile Bag Setting */}
+                <div className="space-y-2">
+                  <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${
+                    isDark ? 'text-slate-400' : 'text-slate-500'
+                  }`}>Tile Bag Mode</label>
+                  <div className={`p-4 rounded-xl border space-y-2 transition-colors ${
+                    isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <label className="flex items-center justify-between cursor-pointer">
+                      <span className="text-sm font-bold">Community Tile Bag</span>
+                      <input
+                        type="checkbox"
+                        checked={communityBagEnabled}
+                        onChange={(e) => setCommunityBagEnabled(e.target.checked)}
+                        className="accent-slate-500 h-4 w-4"
+                      />
+                    </label>
+                    <p className={`text-[11px] mt-1 leading-relaxed ${
+                      isDark ? 'text-slate-400' : 'text-slate-500'
+                    }`}>
+                      {communityBagEnabled 
+                        ? "Players draw from a single shared tile bag, maintaining the distribution/shuffling balance dynamically."
+                        : "Separate bags: each player starts with their own private tile deck generated at the beginning."
+                      }
+                    </p>
+                  </div>
+                </div>
+
+                {/* Q Z / J X Specials Distribution */}
+                <div className="space-y-2">
+                  <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${
+                    isDark ? 'text-slate-400' : 'text-slate-500'
+                  }`}>Q Z / J X Specials</label>
+                  <div className={`p-4 rounded-xl border transition-colors ${
+                    isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <select
+                      value={qzjxSetting}
+                      onChange={(e) => setQzjxSetting(e.target.value)}
+                      className={`w-full text-sm rounded-lg p-2 border font-bold ${
+                        isDark ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-850'
+                      }`}
+                    >
+                      <option value="random2">Random (2 random specials per player) [Default]</option>
+                      <option value="paired">Paired (One player Q/X, other player Z/J)</option>
+                      <option value="halved">Balanced (Exactly one Q/Z and one J/X per player)</option>
+                      <option value="samed">Identical (Both players get the exact same specials)</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <label className={`text-xs font-semibold uppercase tracking-wider block transition-colors ${
                     isDark ? 'text-slate-400' : 'text-slate-500'
@@ -2718,14 +3057,18 @@ export default function App() {
                     timerEnabled,
                     timerDuration,
                     threePlayerMode,
-                    evenDistributionMode,
+                    distributionShuffling,
+                    blankTilesCount,
+                    blankTilesScored,
+                    communityBagEnabled,
+                    qzjxSetting,
                     handicapEnabled,
                     handicaps: [handicapP1, handicapP2, handicapP3]
                   })}
                   className={`w-full font-black text-sm py-3 px-4 rounded-xl shadow-lg transition active:scale-[0.98] border ${
                     isDark 
                       ? 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-900' 
-                      : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-950'
+                      : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-955'
                   }`}
                 >
                   Create Lobby & Wait
@@ -2953,7 +3296,7 @@ export default function App() {
                                 }}
                               >
                                 <span className={`leading-none ${permTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.62}px` }}>{permTile.letter}</span>
-                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.18}px`, bottom: `${cellSize * 0.03}px`, right: `${cellSize * 0.03}px`, color: customColors.scrTileText }}>{permTile.score}</span>
+                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.18}px`, bottom: `${cellSize * 0.03}px`, right: `${cellSize * 0.03}px`, color: customColors.scrTileText }}>{getTileScore(permTile, roomData) || ''}</span>
                                 {permTile.isBlank && <span className="absolute bg-amber-500 rounded-full ring-1 ring-white/30" style={{ top: `${cellSize * 0.08}px`, left: `${cellSize * 0.08}px`, width: `${cellSize * 0.14}px`, height: `${cellSize * 0.14}px` }} title="Blank representation" />}
                               </div>
                             )}
@@ -2971,7 +3314,7 @@ export default function App() {
                                 }}
                               >
                                 <span className={`leading-none ${tempTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.62}px` }}>{tempTile.letter}</span>
-                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.18}px`, bottom: `${cellSize * 0.03}px`, right: `${cellSize * 0.03}px` }}>{tempTile.score}</span>
+                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.18}px`, bottom: `${cellSize * 0.03}px`, right: `${cellSize * 0.03}px` }}>{getTileScore(tempTile, roomData) || ''}</span>
                                 {tempTile.isBlank && <span className="absolute bg-amber-500 rounded-full ring-1 ring-white/30" style={{ top: `${cellSize * 0.08}px`, left: `${cellSize * 0.08}px`, width: `${cellSize * 0.14}px`, height: `${cellSize * 0.14}px` }} />}
                               </div>
                             )}
@@ -3247,11 +3590,21 @@ export default function App() {
                     {Object.values(roomData.players).sort((a, b) => b.score - a.score).map((p, idx) => {
                       let unplayedSum = 0;
                       const rackLetters = (p.rack || []).map(t => t.letter).filter(Boolean);
-                      (p.rack || []).forEach(tile => { unplayedSum += tile.score; });
+                      (p.rack || []).forEach(tile => {
+                        if (!tile.isBlank && tile.letter !== '_') {
+                          unplayedSum += tile.score;
+                        }
+                      });
                       
                       // Determine if this player went out
                       const allPlayers = Object.values(roomData.players);
-                      const gameEndedByGoingOut = allPlayers.some(pl => (pl.rack || []).length === 0 && (pl.deck || []).length === 0);
+                      const gameEndedByGoingOut = allPlayers.some(pl => {
+                        const isRackEmpty = (pl.rack || []).length === 0;
+                        const isDeckEmpty = roomData.communityBagEnabled
+                          ? getCommunityBagSize(roomData.communityDeck) === 0
+                          : (pl.deck || []).length === 0;
+                        return isRackEmpty && isDeckEmpty;
+                      });
                       const wentOut = gameEndedByGoingOut && (p.rack || []).length === 0;
                       
                       // If they went out, their bonus is the sum of all other players' remaining rack values
@@ -3259,7 +3612,11 @@ export default function App() {
                       if (wentOut) {
                         allPlayers.forEach(pl => {
                           if (pl.uid !== p.uid) {
-                            (pl.rack || []).forEach(t => { bonusReceived += t.score; });
+                            (pl.rack || []).forEach(t => {
+                              if (!t.isBlank && t.letter !== '_') {
+                                bonusReceived += t.score;
+                              }
+                            });
                           }
                         });
                       }
@@ -3354,7 +3711,11 @@ export default function App() {
                         <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{username} (You)</span>
                         <span className="text-[10px] bg-[#21252d]/50 px-1.5 py-0.5 rounded text-[#94a3b8]">A</span>
                       </div>
-                      <p className={`text-xs mt-1 transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Remaining Tiles: {me?.deck.length}</p>
+                      <p className={`text-xs mt-1 transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {roomData.communityBagEnabled 
+                          ? `Remaining Bag: ${getCommunityBagSize(roomData.communityDeck)}` 
+                          : `Remaining Tiles: ${me?.deck?.length || 0}`}
+                      </p>
                     </div>
                     <div className="text-right">
                       <span className={`text-2xl font-black transition-colors ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{me?.score}</span>
@@ -3382,7 +3743,11 @@ export default function App() {
                             <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{opp.name}</span>
                             <span className={`text-[10px] px-1.5 py-0.5 rounded ${badgeBg}`}>{letterBadge}</span>
                           </div>
-                          <p className={`text-xs mt-1 transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Remaining Tiles: {opp.deck.length}</p>
+                          <p className={`text-xs mt-1 transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {roomData.communityBagEnabled 
+                              ? `Remaining Bag: ${getCommunityBagSize(roomData.communityDeck)}` 
+                              : `Remaining Tiles: ${opp?.deck?.length || 0}`}
+                          </p>
                         </div>
                         <div className="text-right">
                           <span className={`text-2xl font-black transition-colors ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{opp.score}</span>
@@ -3592,7 +3957,7 @@ export default function App() {
                     </svg>
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-slate-400">
+                <div className="grid grid-cols-2 gap-2 text-slate-400 text-xs">
                   <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
                     <span className="text-slate-400 block">Grid Size:</span>
                     <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.gridSize}x{roomData.gridSize}</span>
@@ -3608,6 +3973,24 @@ export default function App() {
                   <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
                     <span className="text-slate-400 block">Backwards:</span>
                     <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.backwardsAllowed ? 'Allowed' : (roomData.diagonalBackwardsAllowed ? 'Diag Only' : 'Disabled')}</span>
+                  </div>
+                  <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
+                    <span className="text-slate-400 block">Shuffling:</span>
+                    <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.distributionShuffling !== undefined ? roomData.distributionShuffling : 0}%</span>
+                  </div>
+                  <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
+                    <span className="text-slate-400 block">Blank Tiles:</span>
+                    <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.blankTilesCount !== undefined ? roomData.blankTilesCount : 1} ({roomData.blankTilesScored ? 'Scored' : '0 pt'})</span>
+                  </div>
+                  <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
+                    <span className="text-slate-400 block">Tile Bag:</span>
+                    <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{roomData.communityBagEnabled ? 'Community' : 'Separate'}</span>
+                  </div>
+                  <div className={`p-2 rounded transition-colors ${isDark ? 'bg-[#111317]' : 'bg-slate-50 border border-slate-200'}`}>
+                    <span className="text-slate-400 block">QZ / JX Specials:</span>
+                    <span className={`font-extrabold transition-colors ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>
+                      {roomData.qzjxSetting === 'paired' ? 'Paired' : roomData.qzjxSetting === 'halved' ? 'Balanced' : roomData.qzjxSetting === 'samed' ? 'Identical' : 'Random'}
+                    </span>
                   </div>
                 </div>
               </div>
