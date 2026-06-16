@@ -576,7 +576,7 @@ export default function App() {
   const [timerEnabled, setTimerEnabled] = useState(false);
   const [timerDuration, setTimerDuration] = useState(90);
   const [threePlayerMode, setThreePlayerMode] = useState(false);
-  const [distributionShuffling, setDistributionShuffling] = useState(0);
+  const [distributionShuffling, setDistributionShuffling] = useState(100);
   const [blankTilesCount, setBlankTilesCount] = useState(1);
   const [blankTilesScored, setBlankTilesScored] = useState(false);
   const [communityBagEnabled, setCommunityBagEnabled] = useState(false);
@@ -940,7 +940,7 @@ export default function App() {
       gridSize,
       rackSize,
       maxPlayers,
-      distributionShuffling: config.distributionShuffling !== undefined ? config.distributionShuffling : 0,
+      distributionShuffling: config.distributionShuffling !== undefined ? config.distributionShuffling : 100,
       blankTilesCount: config.blankTilesCount !== undefined ? config.blankTilesCount : (gridSize === 15 ? 1 : (gridSize === 17 ? 2 : 3)),
       blankTilesScored: !!config.blankTilesScored,
       communityBagEnabled: !!config.communityBagEnabled,
