@@ -323,6 +323,54 @@ export default function App() {
     } catch { return DEFAULT_COLORS; }
   });
 
+  const [doubleTapZoomSetting, setDoubleTapZoomSetting] = useState(() => {
+    const stored = localStorage.getItem('scrabble_double_tap_zoom');
+    return stored !== null ? parseInt(stored, 10) : 90;
+  });
+
+  const [tileOutlineMode, setTileOutlineMode] = useState(() => {
+    return localStorage.getItem('scrabble_tile_outline_mode') || 'default';
+  });
+
+  const [customOutlines, setCustomOutlines] = useState(() => {
+    try {
+      const stored = localStorage.getItem('scrabble_custom_outlines');
+      return stored ? JSON.parse(stored) : [{ id: '1', color: '#ff0000', types: [] }];
+    } catch {
+      return [{ id: '1', color: '#ff0000', types: [] }];
+    }
+  });
+
+  const ALL_OUTLINE_TYPES = ['DL', 'TL', 'DW', 'TW', 'star', 'board', 'rack', 'permanent', 'tentative'];
+
+  const getTypeLabel = (type) => {
+    switch (type) {
+      case 'DL': return 'DL (Double Letter) Cell';
+      case 'TL': return 'TL (Triple Letter) Cell';
+      case 'DW': return 'DW (Double Word) Cell';
+      case 'TW': return 'TW (Triple Word) Cell';
+      case 'star': return 'Center (★) Cell';
+      case 'board': return 'Regular Board Cell';
+      case 'rack': return 'Rack Tile';
+      case 'permanent': return 'Played Board Tile';
+      case 'tentative': return 'Tentative Placed Tile';
+      default: return type;
+    }
+  };
+
+  const getAvailableTypes = (currentRuleId) => {
+    const claimedTypes = customOutlines.reduce((acc, rule) => {
+      return [...acc, ...rule.types];
+    }, []);
+    return ALL_OUTLINE_TYPES.filter(t => !claimedTypes.includes(t));
+  };
+
+  const getTileOutlineColor = (type, defaultColor) => {
+    if (tileOutlineMode !== 'custom') return defaultColor;
+    const rule = customOutlines.find(r => r.types.includes(type));
+    return rule ? rule.color : defaultColor;
+  };
+
   // Custom Dictionary Tool state
   const [dictWord, setDictWord] = useState('');
   const [dictResult, setDictResult] = useState(null);
@@ -366,7 +414,7 @@ export default function App() {
     const container = boardContainerRef.current;
     const board = innerBoardRef.current;
     if (!container || !board || !roomData) return;
-    if (boardZoom <= 1.2) return;
+    if (boardZoom <= 1.05) return;
 
     let startX = 0, startY = 0, startPanX = 0, startPanY = 0;
 
@@ -811,19 +859,20 @@ export default function App() {
       // Double tap detected: Zoom in/out
       lastTapRef.current = 0;
 
-      if (boardZoom > 1.2) {
+      if (boardZoom > 1.05) {
         // Zoom out: reset zoom and clear pan transform
         setBoardZoom(1.0);
         panRef.current = { x: 0, y: 0 };
         if (innerBoardRef.current) innerBoardRef.current.style.transform = '';
       } else {
         // Zoom in: set zoom then center pan on tapped cell
-        setBoardZoom(2.0);
+        const targetZoom = 1.0 + (doubleTapZoomSetting / 90.0);
+        setBoardZoom(targetZoom);
         setTimeout(() => {
           if (boardContainerRef.current && innerBoardRef.current && roomData) {
             const container = boardContainerRef.current;
             const board = innerBoardRef.current;
-            const newCellSize = baseCellSize * 2.0;
+            const newCellSize = baseCellSize * targetZoom;
             const gap = isMobile ? 1 : 2;
             const extra = isMobile ? 6 : 18;
             const boardW = roomData.gridSize * newCellSize + (roomData.gridSize - 1) * gap + extra;
@@ -2117,14 +2166,18 @@ export default function App() {
     if (prevTurnIndexRef.current !== roomData.turnIndex) {
       prevTurnIndexRef.current = roomData.turnIndex;
       
-      // Light up green for 5 seconds
-      setShouldFlashGreen(true);
-      const timer = setTimeout(() => {
+      // Light up green for 5 seconds only if it is the current player's turn
+      if (roomData.activePlayerId === user?.uid) {
+        setShouldFlashGreen(true);
+        const timer = setTimeout(() => {
+          setShouldFlashGreen(false);
+        }, 5000);
+        return () => clearTimeout(timer);
+      } else {
         setShouldFlashGreen(false);
-      }, 5000);
-      return () => clearTimeout(timer);
+      }
     }
-  }, [roomData?.turnIndex, roomData?.status]);
+  }, [roomData?.turnIndex, roomData?.status, roomData?.activePlayerId, user?.uid]);
 
   const getBoxStyles = () => {
     // 1. Green highlight (first 5 seconds of the turn)
@@ -2336,28 +2389,7 @@ export default function App() {
       {/* --- MAIN BODY --- */}
       <main className={`flex-1 max-w-7xl w-full mx-auto py-4 sm:p-4 md:p-6 flex flex-col gap-6 ${roomData ? 'px-0' : 'px-4'}`}>
 
-        {/* Global Notifications */}
-        {error && (
-          <div className={`p-4 rounded-xl text-sm font-medium flex items-center justify-between shadow-lg border transition-colors ${
-            isDark 
-              ? 'bg-[#2a1313]/80 border-[#421d1d]/80 text-[#fca5a5]' 
-              : 'bg-rose-50 border-rose-200 text-rose-700'
-          }`}>
-            <span>⚠️ {error}</span>
-            <button onClick={() => setError('')} className="hover:text-white font-bold ml-3 text-lg">&times;</button>
-          </div>
-        )}
 
-        {successMsg && (
-          <div className={`p-4 rounded-xl text-sm font-medium flex items-center justify-between shadow-lg border animate-bounce transition-colors ${
-            isDark 
-              ? 'bg-[#132a1d]/80 border-[#1d422b]/80 text-[#86efac]' 
-              : 'bg-emerald-50 border-emerald-200 text-emerald-700'
-          }`}>
-            <span>✅ {successMsg}</span>
-            <button onClick={() => setSuccessMsg('')} className="hover:text-white font-bold ml-3 text-lg">&times;</button>
-          </div>
-        )}
 
         {/* --- ROOM CREATION / JOIN LOBBY --- */}
         {!roomData ? (
@@ -2848,10 +2880,10 @@ export default function App() {
                   backgroundColor: customColors.boardBg,
                   // When zoomed: hidden+none lets our JS own all touch movement with zero axis-locking
                   // When normal: auto+manipulation gives native scroll with fast click response
-                  overflow: boardZoom > 1.2 ? 'hidden' : 'auto',
+                  overflow: boardZoom > 1.05 ? 'hidden' : 'auto',
                   overscrollBehavior: 'none',
-                  touchAction: boardZoom > 1.2 ? 'none' : 'manipulation',
-                  height: (boardZoom > 1.2 && roomData)
+                  touchAction: boardZoom > 1.05 ? 'none' : 'manipulation',
+                  height: (boardZoom > 1.05 && roomData)
                     ? `${roomData.gridSize * baseCellSize + (roomData.gridSize - 1) * (isMobile ? 1 : 2) + (isMobile ? 6 : 18)}px`
                     : undefined,
                 }}
@@ -2859,7 +2891,7 @@ export default function App() {
                 <div
                   ref={innerBoardRef}
                   className="select-none p-0.5 md:p-2 rounded-lg md:rounded-xl border mx-auto"
-                  style={{ backgroundColor: customColors.boardBg, borderColor: isDark ? '#0f1114' : '#d1d5db', willChange: boardZoom > 1.2 ? 'transform' : undefined }}
+                  style={{ backgroundColor: customColors.boardBg, borderColor: isDark ? '#0f1114' : '#d1d5db', willChange: boardZoom > 1.05 ? 'transform' : undefined }}
                 >
                   <div
                     className="grid"
@@ -2883,21 +2915,21 @@ export default function App() {
                         let cellClassName = 'rounded-[4px] cursor-pointer flex flex-col items-center justify-center relative transition duration-150 shadow-sm border touch-manipulation';
 
                         if (!bonus) {
-                          cellStyle = { backgroundColor: customColors.boardTile || '#f8fafc', borderColor: customColors.boardTile || '#f8fafc', color: isDark ? '#94a3b8' : '#94a3b8' };
+                          cellStyle = { backgroundColor: customColors.boardTile || '#f8fafc', borderColor: getTileOutlineColor('board', customColors.boardTile || '#f8fafc'), color: isDark ? '#94a3b8' : '#94a3b8' };
                         } else if (bonus === 'TW') {
-                          cellStyle = { backgroundColor: customColors.twTile, borderColor: customColors.twTile, color: customColors.twText || '#ffffff' };
+                          cellStyle = { backgroundColor: customColors.twTile, borderColor: getTileOutlineColor('TW', customColors.twTile), color: customColors.twText || '#ffffff' };
                           cellLabel = 'TW';
                         } else if (bonus === 'DW') {
-                          cellStyle = { backgroundColor: customColors.dwTile, borderColor: customColors.dwTile, color: customColors.dwText || '#881337' };
+                          cellStyle = { backgroundColor: customColors.dwTile, borderColor: getTileOutlineColor('DW', customColors.dwTile), color: customColors.dwText || '#881337' };
                           cellLabel = 'DW';
                         } else if (bonus === 'TL') {
-                          cellStyle = { backgroundColor: customColors.tlTile || '#2563eb', borderColor: customColors.tlTile || '#2563eb', color: customColors.tlText || '#ffffff' };
+                          cellStyle = { backgroundColor: customColors.tlTile || '#2563eb', borderColor: getTileOutlineColor('TL', customColors.tlTile || '#2563eb'), color: customColors.tlText || '#ffffff' };
                           cellLabel = 'TL';
                         } else if (bonus === 'DL') {
-                          cellStyle = { backgroundColor: customColors.dlTile, borderColor: customColors.dlTile, color: customColors.dlText || '#0c4a6e' };
+                          cellStyle = { backgroundColor: customColors.dlTile, borderColor: getTileOutlineColor('DL', customColors.dlTile), color: customColors.dlText || '#0c4a6e' };
                           cellLabel = 'DL';
                         } else if (bonus === 'star') {
-                          cellStyle = { backgroundColor: customColors.dwTile, borderColor: customColors.dwTile, color: customColors.dwText || '#881337' };
+                          cellStyle = { backgroundColor: customColors.dwTile, borderColor: getTileOutlineColor('star', customColors.dwTile), color: customColors.dwText || '#881337' };
                           cellLabel = '★';
                         }
 
@@ -2917,7 +2949,7 @@ export default function App() {
                                   fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
                                   backgroundColor: customColors.scrTileBg,
                                   color: customColors.scrTileText,
-                                  borderWidth: '1px', borderStyle: 'solid', borderColor: customColors.scrTileBg
+                                  borderWidth: '1px', borderStyle: 'solid', borderColor: getTileOutlineColor('permanent', customColors.scrTileBg)
                                 }}
                               >
                                 <span className={`leading-none ${permTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.62}px` }}>{permTile.letter}</span>
@@ -2935,7 +2967,7 @@ export default function App() {
                                   fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
                                   backgroundColor: customColors.scrTileBg,
                                   color: customColors.scrTileText,
-                                  borderWidth: '1px', borderStyle: 'solid', borderColor: customColors.scrTileBg
+                                  borderWidth: '1px', borderStyle: 'solid', borderColor: getTileOutlineColor('tentative', customColors.scrTileBg)
                                 }}
                               >
                                 <span className={`leading-none ${tempTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.62}px` }}>{tempTile.letter}</span>
@@ -3024,7 +3056,7 @@ export default function App() {
                                   ? '#8f3636'
                                   : isSelected
                                     ? '#f59e0b'
-                                    : customColors.scrTileBg,
+                                    : getTileOutlineColor('rack', customColors.scrTileBg),
                               opacity: isPlaced ? 0.25 : 1,
                             }}
                             className={`w-full min-w-0 flex-1 shrink rounded-[4px] flex flex-col items-center justify-center relative font-extrabold shadow active:scale-95 p-0 ${maxTileWidthClass} aspect-square ${
@@ -3305,9 +3337,7 @@ export default function App() {
             <div className="lg:col-span-4 space-y-6">
 
               {/* Scoreboard Card */}
-              <div className={`border p-5 rounded-2xl shadow-xl space-y-4 transition-colors ${
-                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
-              }`}>
+              <div className={`border p-5 rounded-2xl shadow-xl space-y-4 transition-all duration-300 ${getBoxStyles()}`}>
                 <h3 className={`text-sm font-bold uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Scoreboard</h3>
                 <div className="space-y-3">
                   <div className={`p-4 rounded-xl border flex items-center justify-between transition ${
@@ -3402,9 +3432,7 @@ export default function App() {
               </div>
 
               {/* In-Game Live Word Verification Helper Tool */}
-              <div className={`border p-4 rounded-2xl shadow-xl space-y-3 transition-colors ${
-                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
-              }`}>
+              <div className={`border p-4 rounded-2xl shadow-xl space-y-3 transition-all duration-300 ${getBoxStyles()}`}>
                 <h3 className={`text-sm font-bold uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400' : 'text-slate-505'}`}>📚 SOWPODS Dictionary Lookup</h3>
                 <form onSubmit={handleDictCheck} className="flex gap-2">
                   <input
@@ -3455,9 +3483,7 @@ export default function App() {
               </div>
 
               {/* Real-time Log & History Actions */}
-              <div className={`border p-4 rounded-2xl shadow-xl space-y-3 transition-colors ${
-                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
-              }`}>
+              <div className={`border p-4 rounded-2xl shadow-xl space-y-3 transition-all duration-300 ${getBoxStyles()}`}>
                 <h3 className={`text-sm font-bold uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>📜 Game Play Log</h3>
                 <div className={`h-32 overflow-y-auto overflow-x-hidden break-words space-y-1.5 pr-1 text-[11px] font-mono border-t pt-2 transition-colors ${
                   isDark ? 'border-slate-900' : 'border-slate-200'
@@ -3483,9 +3509,7 @@ export default function App() {
               </div>
 
               {/* Chat Panel Box */}
-              <div className={`border rounded-2xl shadow-xl flex flex-col h-64 overflow-hidden transition-colors ${
-                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
-              }`}>
+              <div className={`border rounded-2xl shadow-xl flex flex-col h-64 overflow-hidden transition-all duration-300 ${getBoxStyles()}`}>
                 <div className={`border-b px-4 py-3 flex items-center justify-between transition-colors ${
                   isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-100 border-slate-200'
                 }`}>
@@ -3552,9 +3576,7 @@ export default function App() {
               </div>
 
               {/* Game Settings Display Card (moved to bottom) */}
-              <div className={`border p-4 rounded-2xl text-xs space-y-2 transition-colors ${
-                isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
-              }`}>
+              <div className={`border p-4 rounded-2xl text-xs space-y-2 transition-all duration-300 ${getBoxStyles()}`}>
                 <div className="flex items-center justify-between mb-1.5">
                   <h4 className={`font-bold uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400' : 'text-slate-505'}`}>Game Settings</h4>
                   <button
@@ -3721,6 +3743,12 @@ export default function App() {
               onClick={() => {
                 setCustomColors(DEFAULT_COLORS);
                 localStorage.removeItem('scrabble_custom_colors');
+                setDoubleTapZoomSetting(90);
+                localStorage.removeItem('scrabble_double_tap_zoom');
+                setTileOutlineMode('default');
+                localStorage.removeItem('scrabble_tile_outline_mode');
+                setCustomOutlines([{ id: '1', color: '#ff0000', types: [] }]);
+                localStorage.removeItem('scrabble_custom_outlines');
               }}
               className={`w-full py-2.5 rounded-xl text-xs font-bold transition border ${
                 isDark ? 'bg-slate-700 hover:bg-slate-600 border-slate-600 text-white' : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-800'
@@ -3728,6 +3756,195 @@ export default function App() {
             >
               Reset to Defaults
             </button>
+
+            {/* Double-Tap Zoom Setting */}
+            <div className={`border rounded-2xl p-4 space-y-3 ${
+              isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+            }`}>
+              <h3 className={`text-xs font-bold uppercase tracking-widest ${
+                isDark ? 'text-slate-400' : 'text-slate-500'
+              }`}>🔍 Double-Tap Zoom Level</h3>
+              <div className="flex items-center justify-between">
+                <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                  Zoom Level: <strong>{doubleTapZoomSetting}%</strong>
+                </span>
+                <span className="text-[10px] text-slate-505 italic">
+                  {doubleTapZoomSetting === 0 ? "Full Board" : doubleTapZoomSetting === 90 ? "Default (1/4 screen)" : doubleTapZoomSetting === 100 ? "Max Zoom" : `${(1 + doubleTapZoomSetting/90).toFixed(2)}x Zoom`}
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                value={doubleTapZoomSetting}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  setDoubleTapZoomSetting(val);
+                  localStorage.setItem('scrabble_double_tap_zoom', val.toString());
+                }}
+                className="w-full h-1.5 bg-slate-250 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
+              />
+            </div>
+
+            {/* Tile Outline Configurator */}
+            <div className={`border rounded-2xl p-4 space-y-3 ${
+              isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+            }`}>
+              <h3 className={`text-xs font-bold uppercase tracking-widest ${
+                isDark ? 'text-slate-400' : 'text-slate-505'
+              }`}>🎨 Tile &amp; Cell Outline Customizer</h3>
+
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer text-xs">
+                  <input
+                    type="radio"
+                    name="tileOutlineMode"
+                    value="default"
+                    checked={tileOutlineMode === 'default'}
+                    onChange={() => {
+                      setTileOutlineMode('default');
+                      localStorage.setItem('scrabble_tile_outline_mode', 'default');
+                    }}
+                    className="accent-amber-500"
+                  />
+                  <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>Same as Tile Color (Default)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-xs">
+                  <input
+                    type="radio"
+                    name="tileOutlineMode"
+                    value="custom"
+                    checked={tileOutlineMode === 'custom'}
+                    onChange={() => {
+                      setTileOutlineMode('custom');
+                      localStorage.setItem('scrabble_tile_outline_mode', 'custom');
+                    }}
+                    className="accent-amber-500"
+                  />
+                  <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>Custom Rules</span>
+                </label>
+              </div>
+
+              {tileOutlineMode === 'custom' && (
+                <div className="space-y-4 pt-2">
+                  {customOutlines.map((rule, idx) => {
+                    const availableOpts = getAvailableTypes(rule.id);
+                    return (
+                      <div key={rule.id} className={`p-4 rounded-xl border space-y-3 ${
+                        isDark ? 'bg-[#111317] border-[#21252d]' : 'bg-slate-50 border-slate-200'
+                      }`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-bold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Rule #{idx + 1}</span>
+                            <div className="relative flex items-center">
+                              <input
+                                type="color"
+                                value={rule.color}
+                                onChange={(e) => {
+                                  const newOutlines = customOutlines.map(r => r.id === rule.id ? { ...r, color: e.target.value } : r);
+                                  setCustomOutlines(newOutlines);
+                                  localStorage.setItem('scrabble_custom_outlines', JSON.stringify(newOutlines));
+                                }}
+                                className="w-8 h-8 rounded cursor-pointer border border-slate-400 p-0 bg-transparent"
+                              />
+                            </div>
+                          </div>
+                          {customOutlines.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newOutlines = customOutlines.filter(r => r.id !== rule.id);
+                                setCustomOutlines(newOutlines);
+                                localStorage.setItem('scrabble_custom_outlines', JSON.stringify(newOutlines));
+                              }}
+                              className="text-xs text-rose-555 hover:text-rose-400 font-bold transition"
+                            >
+                              Remove Rule
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Display targeted tiles/cells */}
+                        <div className="space-y-2">
+                          <span className={`text-xs block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Target Tiles / Cells:</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {rule.types.map(t => (
+                              <span
+                                key={t}
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                              >
+                                {getTypeLabel(t)}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newOutlines = customOutlines.map(r => r.id === rule.id ? { ...r, types: r.types.filter(x => x !== t) } : r);
+                                    setCustomOutlines(newOutlines);
+                                    localStorage.setItem('scrabble_custom_outlines', JSON.stringify(newOutlines));
+                                  }}
+                                  className="hover:text-amber-400 font-bold text-xs ml-1"
+                                >
+                                  &times;
+                                </button>
+                              </span>
+                            ))}
+
+                            {/* Add target dropdown */}
+                            {availableOpts.length > 0 ? (
+                              <div className="relative inline-block">
+                                <select
+                                  value=""
+                                  onChange={(e) => {
+                                    if (!e.target.value) return;
+                                    const val = e.target.value;
+                                    const newOutlines = customOutlines.map(r => r.id === rule.id ? { ...r, types: [...r.types, val] } : r);
+                                    setCustomOutlines(newOutlines);
+                                    localStorage.setItem('scrabble_custom_outlines', JSON.stringify(newOutlines));
+                                  }}
+                                  className={`text-[10px] px-2 py-0.5 rounded-full border cursor-pointer font-bold focus:outline-none transition-colors ${
+                                    isDark
+                                      ? 'bg-[#15181d] border-[#21252d] text-slate-300 hover:border-slate-700'
+                                      : 'bg-white border-slate-200 text-slate-750 hover:border-slate-350'
+                                  }`}
+                                >
+                                  <option value="">+ Add Target</option>
+                                  {availableOpts.map(t => (
+                                    <option key={t} value={t}>{getTypeLabel(t)}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            ) : (
+                              rule.types.length === 0 && (
+                                <span className="text-[10px] text-slate-500 italic">No available targets left</span>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newOutlines = [...customOutlines, { id: Date.now().toString(), color: '#ff0000', types: [] }];
+                      setCustomOutlines(newOutlines);
+                      localStorage.setItem('scrabble_custom_outlines', JSON.stringify(newOutlines));
+                    }}
+                    className={`w-full py-2 rounded-xl text-xs font-bold transition border flex items-center justify-center gap-1.5 ${
+                      isDark 
+                        ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200' 
+                        : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Custom Outline Rule
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
