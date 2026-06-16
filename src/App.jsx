@@ -1520,9 +1520,12 @@ export default function App() {
     const size = roomData.gridSize;
     const h = Math.floor(size / 2);
     const isFirstMove = Object.keys(roomData.board).length === 0;
+    const isPlayerFirstMove = roomData.freeForAll
+      ? !Object.values(roomData.board).some(tile => tile.placedBy === user.uid)
+      : isFirstMove;
 
-    // First move must cover the center star
-    if (isFirstMove) {
+    // First move must cover the center star (only in turn-based mode)
+    if (!roomData.freeForAll && isFirstMove) {
       const coversCenter = coords.some(co => co.r === h && co.c === h);
       if (!coversCenter) {
         return { valid: false, error: "The very first move of the game must cross the center Star." };
@@ -1532,7 +1535,7 @@ export default function App() {
     // Single tile check
     if (coords.length === 1) {
       const single = coords[0];
-      if (!isFirstMove) {
+      if (!isPlayerFirstMove) {
         // Must connect orthogonally or diagonally
         const hasAdjacency = checkAdjacency(single.r, single.c);
         if (!hasAdjacency) {
@@ -1599,7 +1602,7 @@ export default function App() {
     }
 
     // Connection Check: If not first move, at least one tile must be adjacent to permanent board letters
-    if (!isFirstMove) {
+    if (!isPlayerFirstMove) {
       const anyAdjacent = coords.some(co => checkAdjacency(co.r, co.c));
       if (!anyAdjacent) {
         return { valid: false, error: "Your word must connect to an existing tile on the board." };
@@ -1818,7 +1821,10 @@ export default function App() {
 
     // --- 2-AXIS RULE VALIDATION ---
     const isFirstMove = Object.keys(roomData.board).length === 0;
-    if (formedWordsList.length > 0 && !isFirstMove) {
+    const isPlayerFirstMove = roomData.freeForAll
+      ? !Object.values(roomData.board).some(tile => tile.placedBy === user.uid)
+      : isFirstMove;
+    if (formedWordsList.length > 0 && !isPlayerFirstMove) {
       // 1. Identify the main word of this play
       let mainWord = null;
       if (coords.length > 1) {
@@ -2500,6 +2506,7 @@ export default function App() {
 
     let shared = [];
     let drawUpdates = {};
+    let updatedDeck = [];
 
     if (roomData.communityBagEnabled) {
       const drawRes = drawTilesForPlayer(roomData, user.uid, tilesToReturn.length);
@@ -2522,7 +2529,7 @@ export default function App() {
           drawnRack.push(myDeck.shift());
         }
       }
-      const updatedDeck = shuffleArray([...myDeck, ...tilesToReturn]);
+      updatedDeck = shuffleArray([...myDeck, ...tilesToReturn]);
       
       updatedPlayers[user.uid] = {
         ...myPlayer,
