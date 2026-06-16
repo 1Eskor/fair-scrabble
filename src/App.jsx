@@ -663,6 +663,11 @@ export default function App() {
     return localStorage.getItem('scrabble_highlight_color') || '#eab308';
   });
 
+  const [highlightThickness, setHighlightThickness] = useState(() => {
+    const stored = localStorage.getItem('scrabble_highlight_thickness');
+    return stored !== null ? Number(stored) : 3;
+  });
+
   const [highlightActive, setHighlightActive] = useState(true);
 
   const [tileOutlineMode, setTileOutlineMode] = useState(() => {
@@ -3860,11 +3865,14 @@ export default function App() {
                                 <div 
                                   className="absolute pointer-events-none rounded-[4px]"
                                   style={{
-                                    top: '-2px', left: '-2px', right: '-2px', bottom: '-2px',
-                                    borderTop: isTopBoundary ? `3px solid ${highlightColor}` : undefined,
-                                    borderBottom: isBottomBoundary ? `3px solid ${highlightColor}` : undefined,
-                                    borderLeft: isLeftBoundary ? `3px solid ${highlightColor}` : undefined,
-                                    borderRight: isRightBoundary ? `3px solid ${highlightColor}` : undefined,
+                                    top: `-${Math.ceil(highlightThickness / 2)}px`,
+                                    left: `-${Math.ceil(highlightThickness / 2)}px`,
+                                    right: `-${Math.ceil(highlightThickness / 2)}px`,
+                                    bottom: `-${Math.ceil(highlightThickness / 2)}px`,
+                                    borderTop: isTopBoundary ? `${highlightThickness}px solid ${highlightColor}` : undefined,
+                                    borderBottom: isBottomBoundary ? `${highlightThickness}px solid ${highlightColor}` : undefined,
+                                    borderLeft: isLeftBoundary ? `${highlightThickness}px solid ${highlightColor}` : undefined,
+                                    borderRight: isRightBoundary ? `${highlightThickness}px solid ${highlightColor}` : undefined,
                                     zIndex: 15
                                   }}
                                 />
@@ -4698,6 +4706,8 @@ export default function App() {
                 localStorage.removeItem('scrabble_highlight_duration');
                 setHighlightColor('#eab308');
                 localStorage.removeItem('scrabble_highlight_color');
+                setHighlightThickness(3);
+                localStorage.removeItem('scrabble_highlight_thickness');
               }}
               className={`w-full py-2.5 rounded-xl text-xs font-bold transition border ${
                 isDark ? 'bg-slate-700 hover:bg-slate-600 border-slate-600 text-white' : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-800'
@@ -4944,6 +4954,29 @@ export default function App() {
                   <option value="15">15 seconds</option>
                   <option value="30">30 seconds</option>
                   <option value="60">60 seconds</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <label className={`text-xs font-bold ${isDark ? 'text-slate-350' : 'text-slate-700'}`}>Highlight Thickness:</label>
+                <select
+                  value={highlightThickness}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setHighlightThickness(val);
+                    localStorage.setItem('scrabble_highlight_thickness', val);
+                  }}
+                  className={`text-xs rounded-lg p-2 border font-bold ${
+                    isDark ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-850'
+                  }`}
+                >
+                  <option value="1">1px (Thin)</option>
+                  <option value="2">2px</option>
+                  <option value="3">3px (Medium)</option>
+                  <option value="4">4px</option>
+                  <option value="5">5px (Thick)</option>
+                  <option value="6">6px</option>
+                  <option value="8">8px</option>
                 </select>
               </div>
 
