@@ -686,6 +686,8 @@ export default function App() {
   const [pendingBlankCoords, setPendingBlankCoords] = useState(null);
   const [exchangeMode, setExchangeMode] = useState(false);
   const [selectedExchangeIds, setSelectedExchangeIds] = useState([]);
+  const [countdownTimeLeft, setCountdownTimeLeft] = useState(null);
+  const [ffaGreenFlash, setFfaGreenFlash] = useState(false);
 
   // Customization State
   const [showCustomizationPage, setShowCustomizationPage] = useState(false);
@@ -1000,6 +1002,84 @@ export default function App() {
     });
     return () => unsubscribe();
   }, [user, roomId]);
+
+  // Helper to determine if all players are ready in Free-For-All
+  const allReady = roomData && roomData.freeForAll
+    ? roomData.playerOrder.every(uid => roomData.players[uid]?.ready)
+    : true;
+
+  // Recalls tentative tiles when a permanent tile occupies the same cell in Free-For-All
+  useEffect(() => {
+    if (!roomData || !user || !roomData.freeForAll) return;
+    const keysToRecall = [];
+    Object.keys(tentativePlaced).forEach(key => {
+      if (roomData.board[key]) {
+        keysToRecall.push(key);
+      }
+    });
+
+    if (keysToRecall.length > 0) {
+      const newTentative = { ...tentativePlaced };
+      keysToRecall.forEach(key => {
+        delete newTentative[key];
+      });
+      setTentativePlaced(newTentative);
+      setError("Some of your tiles were recalled because another player occupied those cells first!");
+    }
+  }, [roomData?.board]);
+
+  // Synchronize 3-second countdown and 3-second green flash for Free-For-All
+  useEffect(() => {
+    if (!roomData || !roomData.freeForAll || !roomData.countdownStartTime) {
+      setCountdownTimeLeft(null);
+      setFfaGreenFlash(false);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - roomData.countdownStartTime;
+      if (elapsed < 1000) {
+        setCountdownTimeLeft(3);
+        setFfaGreenFlash(false);
+      } else if (elapsed < 2000) {
+        setCountdownTimeLeft(2);
+        setFfaGreenFlash(false);
+      } else if (elapsed < 3000) {
+        setCountdownTimeLeft(1);
+        setFfaGreenFlash(false);
+      } else if (elapsed < 6000) {
+        setCountdownTimeLeft(null);
+        setFfaGreenFlash(true);
+      } else {
+        setCountdownTimeLeft(null);
+        setFfaGreenFlash(false);
+        clearInterval(interval);
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [roomData?.countdownStartTime, roomData?.freeForAll]);
+
+  const handlePlayerReady = async () => {
+    if (!roomData || !roomId || !user) return;
+    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
+    
+    const otherPlayers = roomData.playerOrder.filter(uid => uid !== user.uid);
+    const othersReady = otherPlayers.every(uid => roomData.players[uid]?.ready);
+    
+    const updates = {
+      [`players.${user.uid}.ready`]: true
+    };
+    if (othersReady) {
+      updates.countdownStartTime = Date.now();
+    }
+    
+    try {
+      await updateDoc(roomRef, updates);
+    } catch (e) {
+      setError("Failed to ready up: " + e.message);
+    }
+  };
 
   // Clear local tentative placements and selections when the board is reset/rematched
   useEffect(() => {
@@ -1423,6 +1503,12 @@ export default function App() {
 
   const placeTileOnBoard = (r, c) => {
     if (selectedRackTile === null || !roomData) return;
+
+    // In Free-For-All mode, disable placement during pre-game ready check or active countdown
+    if (roomData.freeForAll && (!allReady || countdownTimeLeft !== null)) {
+      return;
+    }
+
     if (!roomData.freeForAll && roomData.activePlayerId !== user.uid) {
       setError("Wait for your turn!");
       return;
@@ -1515,6 +1601,12 @@ export default function App() {
 
     if (coords.length === 0) {
       return { valid: false, error: "Please place some tiles on the board first." };
+    }
+
+    // Ensure no tentative tiles are placed on cells already occupied by permanent board tiles
+    const hasOccupiedCollision = coords.some(co => roomData.board[`${co.r},${co.c}`]);
+    if (hasOccupiedCollision) {
+      return { valid: false, error: "One or more of your placed cells are already occupied by another player." };
     }
 
     const size = roomData.gridSize;
@@ -2023,6 +2115,12 @@ export default function App() {
   const handlePlayTurn = async () => {
     if (!roomData || !roomId) return;
     if (!roomData.freeForAll && roomData.activePlayerId !== user.uid) return;
+
+    // In Free-For-All, block submission during ready-check or active countdown
+    if (roomData.freeForAll && (!allReady || countdownTimeLeft !== null)) {
+      setError("Game hasn't started yet — wait for the countdown!");
+      return;
+    }
 
     setError('');
     const scoreData = getFormedWordsAndScores();
@@ -2677,6 +2775,7 @@ export default function App() {
         deck: pDeck,
         rack: pRack,
         isReady: true,
+        ready: false,          // reset FFA readiness for rematch
         lastActive: Date.now()
       };
     });
@@ -2699,6 +2798,7 @@ export default function App() {
         consecutiveZeroTurns: 0,
         activePlayerId: roomData.playerOrder[0],
         turnStartTime: Date.now(),
+        countdownStartTime: null,       // reset FFA countdown
         communityDeck: roomData.communityBagEnabled ? currentCommunity : null,
         decks: roomData.communityBagEnabled ? null : decksResult
       });
@@ -2954,6 +3054,11 @@ export default function App() {
   const getBoxStyles = () => {
     if (!coloursEnabled) {
       return isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200';
+    }
+
+    // Free-For-All 3s green flash when game starts
+    if (roomData?.freeForAll && ffaGreenFlash) {
+      return isDark ? 'bg-[#064e3b] border-[#059669] shadow-[0_0_15px_rgba(5,150,105,0.4)]' : 'bg-[#e2fced] border-[#a7f3d0] shadow-[0_0_15px_rgba(167,243,208,0.4)]';
     }
 
     // 1. Warning warning (last 10 seconds of active player's turn) - Takes precedence
@@ -3869,8 +3974,47 @@ export default function App() {
                 <div className="flex items-center gap-3">
                   {roomData.status === 'playing' ? (
                     roomData.freeForAll ? (
-                      <div className={`px-4 py-2 rounded-xl border text-sm font-black flex items-center gap-2 transition-colors bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-orange-500/30 text-orange-400 animate-pulse shadow-md`}>
-                        🔥 Free-For-All Play! Place tiles anytime!
+                      <div className="flex items-center gap-2">
+                        {!allReady ? (
+                          // Pre-game: show ready button or waiting indicator
+                          roomData.players[user.uid]?.ready ? (
+                            <div className={`px-4 py-2 rounded-xl border text-sm font-bold flex items-center gap-2 animate-pulse ${
+                              isDark ? 'bg-amber-900/30 border-amber-700/50 text-amber-400' : 'bg-amber-50 border-amber-300 text-amber-700'
+                            }`}>
+                              ✅ Ready! Waiting for opponent...
+                            </div>
+                          ) : (
+                            <button
+                              onClick={handlePlayerReady}
+                              className={`px-5 py-2 rounded-xl border text-sm font-black transition active:scale-95 shadow-lg ${
+                                isDark
+                                  ? 'bg-emerald-700 hover:bg-emerald-600 border-emerald-600 text-white shadow-emerald-900/40'
+                                  : 'bg-emerald-500 hover:bg-emerald-400 border-emerald-400 text-white shadow-emerald-200'
+                              }`}
+                            >
+                              ✋ I'm Ready!
+                            </button>
+                          )
+                        ) : countdownTimeLeft !== null ? (
+                          // Active countdown: 3 / 2 / 1
+                          <div className={`px-6 py-2 rounded-xl border text-2xl font-black flex items-center gap-2 animate-bounce ${
+                            isDark ? 'bg-emerald-900/40 border-emerald-700/60 text-emerald-300' : 'bg-emerald-50 border-emerald-400 text-emerald-700'
+                          }`}>
+                            {countdownTimeLeft}
+                          </div>
+                        ) : ffaGreenFlash ? (
+                          // Flash "GO!"
+                          <div className={`px-5 py-2 rounded-xl border text-lg font-black flex items-center gap-2 ${
+                            isDark ? 'bg-emerald-800 border-emerald-600 text-emerald-200' : 'bg-emerald-100 border-emerald-400 text-emerald-800'
+                          }`}>
+                            🚀 GO!
+                          </div>
+                        ) : (
+                          // Active game
+                          <div className="px-4 py-2 rounded-xl border text-sm font-black flex items-center gap-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-orange-500/30 text-orange-400 animate-pulse shadow-md">
+                            🔥 Free-For-All!
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
