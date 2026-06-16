@@ -629,6 +629,20 @@ export default function App() {
     return stored !== null ? parseInt(stored, 10) : 90;
   });
 
+  const [fiveSecGreenFlashSetting, setFiveSecGreenFlashSetting] = useState(() => {
+    return localStorage.getItem('scrabble_5s_green_flash') === 'true';
+  });
+
+  const [highlightDuration, setHighlightDuration] = useState(() => {
+    return localStorage.getItem('scrabble_highlight_duration') || 'full turn';
+  });
+
+  const [highlightColor, setHighlightColor] = useState(() => {
+    return localStorage.getItem('scrabble_highlight_color') || '#eab308';
+  });
+
+  const [highlightActive, setHighlightActive] = useState(true);
+
   const [tileOutlineMode, setTileOutlineMode] = useState(() => {
     return localStorage.getItem('scrabble_tile_outline_mode') || 'default';
   });
@@ -957,6 +971,7 @@ export default function App() {
       handicapEnabled: !!config.handicapEnabled,
       handicaps: config.handicapEnabled ? config.handicaps : [0, 0, 0],
       communityDeck: config.communityBagEnabled ? decksResult.communityDeck : null,
+      decks: config.communityBagEnabled ? null : decksResult, // Save pre-generated decks in the room
       players: {
         [user.uid]: {
           uid: user.uid,
@@ -1028,14 +1043,21 @@ export default function App() {
         // Get the appropriate deck
         let myDeck = [];
         if (!data.communityBagEnabled) {
-          const decks = generateEvenDecks(data.gridSize, maxPlayers, {
-            distributionShuffling: data.distributionShuffling,
-            blankTilesCount: data.blankTilesCount,
-            qzjxSetting: data.qzjxSetting,
-            randomizeBagLetters: data.randomizeBagLetters || 0
-          });
-          const myDeckKey = `deck${currentCount + 1}`;
-          myDeck = decks[myDeckKey] || [];
+          if (data.decks) {
+            // Retrieve pre-generated deck consistently
+            const myDeckKey = `deck${currentCount + 1}`;
+            myDeck = data.decks[myDeckKey] || [];
+          } else {
+            // Fallback for older rooms that didn't save decks at creation
+            const decks = generateEvenDecks(data.gridSize, maxPlayers, {
+              distributionShuffling: data.distributionShuffling,
+              blankTilesCount: data.blankTilesCount,
+              qzjxSetting: data.qzjxSetting,
+              randomizeBagLetters: data.randomizeBagLetters || 0
+            });
+            const myDeckKey = `deck${currentCount + 1}`;
+            myDeck = decks[myDeckKey] || [];
+          }
         }
 
         const initialScore = (data.handicapEnabled && data.handicaps) ? (data.handicaps[currentCount] || 0) : 0;
@@ -1085,7 +1107,11 @@ export default function App() {
         const p = finalPlayers[uid];
         if (p.rack.length === 0) {
           if (data.communityBagEnabled) {
-            const { drawn, updates } = drawTilesForPlayer({ ...data, communityDeck: currentCommunity }, uid, rackSize);
+            const { drawn, updates } = drawTilesForPlayer(
+              { ...data, players: finalPlayers, playerOrder: updatedOrder, communityDeck: currentCommunity },
+              uid,
+              rackSize
+            );
             p.rack = drawn;
             currentCommunity = updates.communityDeck;
           } else {
@@ -1761,61 +1787,17 @@ export default function App() {
     // --- DICTIONARY VALIDATION & FORGIVENESS ---
     const finalWordsList = [];
     if (roomData.validationMode === 'strict') {
-      const wordValidity = new Map();
       for (const w of formedWordsList) {
         const isValid = checkWordLocal(w.forwardWord) ||
           (roomData.backwardsAllowed && checkWordLocal(w.backwardWord)) ||
           (roomData.diagonalBackwardsAllowed && checkWordLocal(w.backwardWord));
-        wordValidity.set(w, isValid);
-      }
-
-      const isSingleTilePlay = coords.length === 1;
-      const hasAtLeastOneValidWord = Array.from(wordValidity.values()).some(v => v);
-
-      let mainWord = null;
-      if (isSingleTilePlay) {
-        let maxLen = 0;
-        formedWordsList.forEach(w => {
-          if (w.forwardWord.length > maxLen) {
-            maxLen = w.forwardWord.length;
-            mainWord = w;
-          }
-        });
-      } else if (coords.length > 1) {
-        const mainAxis = normalizeDirection(direction);
-        mainWord = formedWordsList.find(w => w.axis.dr === mainAxis.dr && w.axis.dc === mainAxis.dc);
-      }
-
-      const crossWords = formedWordsList.filter(w => w !== mainWord);
-      const isMainWordValid = mainWord ? wordValidity.get(mainWord) : true;
-      const hasValidCrossWord = crossWords.some(w => wordValidity.get(w));
-
-      for (const w of formedWordsList) {
-        if (!wordValidity.get(w)) {
-          let isForgiven = false;
-
-          if (isSingleTilePlay) {
-            if (hasAtLeastOneValidWord) isForgiven = true;
-          } else {
-            if (w === mainWord) {
-              isForgiven = false; // Main word must be valid
-            } else {
-              if (isMainWordValid && hasValidCrossWord) {
-                isForgiven = true;
-              }
-            }
-          }
-
-          if (!isForgiven) {
-            return {
-              words: [],
-              error: `"${w.forwardWord}" was not recognized as a valid English word! Play rejected.`
-            };
-          }
-          // If forgiven, we omit it from finalWordsList so it receives no points
-        } else {
-          finalWordsList.push(w);
+        if (!isValid) {
+          return {
+            words: [],
+            error: `"${w.forwardWord}" was not recognized as a valid English word! Play rejected.`
+          };
         }
+        finalWordsList.push(w);
       }
     } else {
       finalWordsList.push(...formedWordsList);
@@ -2026,6 +2008,11 @@ export default function App() {
         : (updatedPlayers[user.uid].deck || []).length === 0
     );
 
+    const placedCoords = Object.keys(tentativePlaced).map(key => {
+      const [r, c] = key.split(',').map(Number);
+      return { r, c };
+    });
+
     let finalUpdateObj = {
       board: updatedBoard,
       players: updatedPlayers,
@@ -2033,7 +2020,12 @@ export default function App() {
       turnStartTime: Date.now(),
       history: [...roomData.history, historyItem],
       turnIndex: roomData.turnIndex + 1,
-      consecutiveZeroTurns: 0
+      consecutiveZeroTurns: 0,
+      lastPlay: {
+        timestamp: Date.now(),
+        playerUid: user.uid,
+        coords: placedCoords
+      }
     };
     if (roomData.communityBagEnabled) {
       finalUpdateObj.communityDeck = drawUpdates.communityDeck;
@@ -2160,6 +2152,11 @@ export default function App() {
               : (updatedPlayers[user.uid].deck || []).length === 0
           );
 
+          const placedCoords = Object.keys(tentativePlaced).map(key => {
+            const [r, c] = key.split(',').map(Number);
+            return { r, c };
+          });
+
           let finalUpdateObj = {
             board: updatedBoard,
             players: updatedPlayers,
@@ -2167,7 +2164,12 @@ export default function App() {
             turnStartTime: Date.now(),
             history: [...roomData.history, historyItem],
             turnIndex: roomData.turnIndex + 1,
-            consecutiveZeroTurns: 0
+            consecutiveZeroTurns: 0,
+            lastPlay: {
+              timestamp: Date.now(),
+              playerUid: user.uid,
+              coords: placedCoords
+            }
           };
           if (roomData.communityBagEnabled) {
             finalUpdateObj.communityDeck = drawUpdates.communityDeck;
@@ -2617,36 +2619,95 @@ export default function App() {
   const prevTurnIndexRef = useRef(-1);
 
   useEffect(() => {
-    if (!roomData || roomData.status !== 'playing') return;
-    
-    // Check if the turn has changed
-    if (prevTurnIndexRef.current !== roomData.turnIndex) {
-      prevTurnIndexRef.current = roomData.turnIndex;
-      
-      // Light up green for 5 seconds only if it is the current player's turn
-      if (roomData.activePlayerId === user?.uid) {
-        setShouldFlashGreen(true);
-        const timer = setTimeout(() => {
-          setShouldFlashGreen(false);
-        }, 5000);
-        return () => clearTimeout(timer);
-      } else {
-        setShouldFlashGreen(false);
-      }
+    if (!roomData || roomData.status !== 'playing') {
+      setShouldFlashGreen(false);
+      return;
     }
-  }, [roomData?.turnIndex, roomData?.status, roomData?.activePlayerId, user?.uid]);
+    
+    const isMyTurnNow = roomData.activePlayerId === user?.uid;
+    if (!isMyTurnNow) {
+      setShouldFlashGreen(false);
+      return;
+    }
+
+    if (fiveSecGreenFlashSetting) {
+      const checkGreenFlash = () => {
+        const start = roomData.turnStartTime || Date.now();
+        const elapsed = (Date.now() - start) / 1000;
+        if (elapsed < 5) {
+          setShouldFlashGreen(true);
+          const remaining = Math.max(0, 5000 - (Date.now() - start));
+          const timer = setTimeout(() => {
+            setShouldFlashGreen(false);
+          }, remaining);
+          return timer;
+        } else {
+          setShouldFlashGreen(false);
+        }
+      };
+
+      const timer = checkGreenFlash();
+      return () => {
+        if (timer) clearTimeout(timer);
+      };
+    } else {
+      setShouldFlashGreen(true);
+    }
+  }, [roomData?.turnIndex, roomData?.status, roomData?.activePlayerId, roomData?.turnStartTime, user?.uid, fiveSecGreenFlashSetting]);
+
+  // Expiration timer for most recent play highlight
+  useEffect(() => {
+    const lastPlayTime = roomData?.lastPlay?.timestamp;
+    if (!lastPlayTime || highlightDuration === 'full turn') {
+      setHighlightActive(true);
+      return;
+    }
+
+    const durationSec = parseInt(highlightDuration, 10);
+    if (isNaN(durationSec)) {
+      setHighlightActive(true);
+      return;
+    }
+
+    const checkActive = () => {
+      const elapsed = (Date.now() - lastPlayTime) / 1000;
+      if (elapsed < durationSec) {
+        setHighlightActive(true);
+        const remainingMs = (durationSec - elapsed) * 1000;
+        const timer = setTimeout(() => {
+          setHighlightActive(false);
+        }, remainingMs);
+        return timer;
+      } else {
+        setHighlightActive(false);
+      }
+    };
+
+    const timer = checkActive();
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [roomData?.lastPlay?.timestamp, highlightDuration]);
 
   const getBoxStyles = () => {
-    // 1. Green highlight (first 5 seconds of the turn)
-    if (coloursEnabled && shouldFlashGreen) {
-      return isDark ? 'bg-[#064e3b] border-[#059669]' : 'bg-[#e2fced] border-[#a7f3d0]';
+    if (!coloursEnabled) {
+      return isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200';
     }
 
-    // 2. Red warning (last 10 seconds of active player's turn)
+    // 1. Warning warning (last 10 seconds of active player's turn) - Takes precedence
     const isWarning = roomData?.status === 'playing' && roomData.timerEnabled && remainingTime <= 10;
-    
-    if (coloursEnabled && isWarning) {
-      return isDark ? 'flash-red-dark border-transparent' : 'flash-red-light border-transparent';
+    if (isWarning) {
+      const isMyTurnNow = roomData?.activePlayerId === user?.uid;
+      if (isMyTurnNow) {
+        return isDark ? 'flash-red-dark border-transparent' : 'flash-red-light border-transparent';
+      } else {
+        return isDark ? 'flash-yellow-dark border-transparent' : 'flash-yellow-light border-transparent';
+      }
+    }
+
+    // 2. Green highlight (when it is the player's turn)
+    if (shouldFlashGreen) {
+      return isDark ? 'bg-[#064e3b] border-[#059669]' : 'bg-[#e2fced] border-[#a7f3d0]';
     }
     
     // 3. Normal styles
@@ -2748,6 +2809,20 @@ export default function App() {
         }
         .flash-red-light {
           animation: flashRedLight 1s infinite;
+        }
+        @keyframes flashYellowDark {
+          0%, 100% { background-color: #15181d; border-color: #21252d; }
+          50% { background-color: #713f12; border-color: #854d0e; }
+        }
+        @keyframes flashYellowLight {
+          0%, 100% { background-color: #ffffff; border-color: #cbd5e1; }
+          50% { background-color: #fef9c3; border-color: #fef08a; }
+        }
+        .flash-yellow-dark {
+          animation: flashYellowDark 1s infinite;
+        }
+        .flash-yellow-light {
+          animation: flashYellowLight 1s infinite;
         }
       `}</style>
 
@@ -3540,88 +3615,113 @@ export default function App() {
                     }}
                   >
                     {/* eslint-disable-next-line react-hooks/refs */}
-                    {Array.from({ length: roomData.gridSize }).map((_, r) => (
-                      Array.from({ length: roomData.gridSize }).map((_, c) => {
-                        const key = `${r},${c}`;
-                        const permTile = roomData.board[key];
-                        const tempTile = tentativePlaced[key];
-                        const bonus = getBonus(r, c, roomData.gridSize);
+                    {(() => {
+                      const lastPlayCoords = roomData?.lastPlay?.coords || [];
+                      const lastPlayCoordsSet = new Set(lastPlayCoords.map(co => `${co.r},${co.c}`));
+                      return Array.from({ length: roomData.gridSize }).map((_, r) => (
+                        Array.from({ length: roomData.gridSize }).map((_, c) => {
+                          const key = `${r},${c}`;
+                          const permTile = roomData.board[key];
+                          const tempTile = tentativePlaced[key];
+                          const bonus = getBonus(r, c, roomData.gridSize);
 
-                        // Layout styling for special squares — use customColors for TW/DW/DL, defaults for blank/TL
-                        let cellLabel = '';
-                        let cellStyle = {};
-                        let cellClassName = 'rounded-[4px] cursor-pointer flex flex-col items-center justify-center relative transition duration-150 shadow-sm border touch-manipulation';
+                          // Layout styling for special squares — use customColors for TW/DW/DL, defaults for blank/TL
+                          let cellLabel = '';
+                          let cellStyle = {};
+                          let cellClassName = 'rounded-[4px] cursor-pointer flex flex-col items-center justify-center relative transition duration-150 shadow-sm border touch-manipulation';
 
-                        if (!bonus) {
-                          cellStyle = { backgroundColor: customColors.boardTile || '#f8fafc', borderColor: getTileOutlineColor('board', customColors.boardTile || '#f8fafc'), color: isDark ? '#94a3b8' : '#94a3b8' };
-                        } else if (bonus === 'TW') {
-                          cellStyle = { backgroundColor: customColors.twTile, borderColor: getTileOutlineColor('TW', customColors.twTile), color: customColors.twText || '#ffffff' };
-                          cellLabel = 'TW';
-                        } else if (bonus === 'DW') {
-                          cellStyle = { backgroundColor: customColors.dwTile, borderColor: getTileOutlineColor('DW', customColors.dwTile), color: customColors.dwText || '#881337' };
-                          cellLabel = 'DW';
-                        } else if (bonus === 'TL') {
-                          cellStyle = { backgroundColor: customColors.tlTile || '#2563eb', borderColor: getTileOutlineColor('TL', customColors.tlTile || '#2563eb'), color: customColors.tlText || '#ffffff' };
-                          cellLabel = 'TL';
-                        } else if (bonus === 'DL') {
-                          cellStyle = { backgroundColor: customColors.dlTile, borderColor: getTileOutlineColor('DL', customColors.dlTile), color: customColors.dlText || '#0c4a6e' };
-                          cellLabel = 'DL';
-                        } else if (bonus === 'star') {
-                          cellStyle = { backgroundColor: customColors.dwTile, borderColor: getTileOutlineColor('star', customColors.dwTile), color: customColors.dwText || '#881337' };
-                          cellLabel = '★';
-                        }
+                          if (!bonus) {
+                            cellStyle = { backgroundColor: customColors.boardTile || '#f8fafc', borderColor: getTileOutlineColor('board', customColors.boardTile || '#f8fafc'), color: isDark ? '#94a3b8' : '#94a3b8' };
+                          } else if (bonus === 'TW') {
+                            cellStyle = { backgroundColor: customColors.twTile, borderColor: getTileOutlineColor('TW', customColors.twTile), color: customColors.twText || '#ffffff' };
+                            cellLabel = 'TW';
+                          } else if (bonus === 'DW') {
+                            cellStyle = { backgroundColor: customColors.dwTile, borderColor: getTileOutlineColor('DW', customColors.dwTile), color: customColors.dwText || '#881337' };
+                            cellLabel = 'DW';
+                          } else if (bonus === 'TL') {
+                            cellStyle = { backgroundColor: customColors.tlTile || '#2563eb', borderColor: getTileOutlineColor('TL', customColors.tlTile || '#2563eb'), color: customColors.tlText || '#ffffff' };
+                            cellLabel = 'TL';
+                          } else if (bonus === 'DL') {
+                            cellStyle = { backgroundColor: customColors.dlTile, borderColor: getTileOutlineColor('DL', customColors.dlTile), color: customColors.dlText || '#0c4a6e' };
+                            cellLabel = 'DL';
+                          } else if (bonus === 'star') {
+                            cellStyle = { backgroundColor: customColors.dwTile, borderColor: getTileOutlineColor('star', customColors.dwTile), color: customColors.dwText || '#881337' };
+                            cellLabel = '★';
+                          }
 
-                        return (
-                          <div
-                            key={key}
-                            onClick={() => handleBoardCellTap(r, c)}
-                            className={cellClassName}
-                            style={{ width: `${cellSize}px`, height: `${cellSize}px`, touchAction: 'manipulation', ...cellStyle }}
-                          >
-                            {/* Render permanent tile */}
-                            {permTile && (
-                              <div 
-                                className="absolute rounded-[4px] flex flex-col items-center justify-center font-extrabold shadow scale-100"
-                                style={{
-                                  top: '-1px', left: '-1px', right: '-1px', bottom: '-1px',
-                                  fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
-                                  backgroundColor: customColors.scrTileBg,
-                                  color: customColors.scrTileText,
-                                  borderWidth: '1px', borderStyle: 'solid', borderColor: getTileOutlineColor('permanent', customColors.scrTileBg)
-                                }}
-                              >
-                                <span className={`leading-none ${permTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.62}px` }}>{permTile.letter}</span>
-                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.18}px`, bottom: `${cellSize * 0.03}px`, right: `${cellSize * 0.03}px`, color: customColors.scrTileText }}>{getTileScore(permTile, roomData) || ''}</span>
-                                {permTile.isBlank && <span className="absolute bg-amber-500 rounded-full ring-1 ring-white/30" style={{ top: `${cellSize * 0.08}px`, left: `${cellSize * 0.08}px`, width: `${cellSize * 0.14}px`, height: `${cellSize * 0.14}px` }} title="Blank representation" />}
-                              </div>
-                            )}
+                          const inLastPlay = highlightActive && lastPlayCoordsSet.has(key);
+                          const isTopBoundary = inLastPlay && !lastPlayCoordsSet.has(`${r-1},${c}`);
+                          const isBottomBoundary = inLastPlay && !lastPlayCoordsSet.has(`${r+1},${c}`);
+                          const isLeftBoundary = inLastPlay && !lastPlayCoordsSet.has(`${r},${c-1}`);
+                          const isRightBoundary = inLastPlay && !lastPlayCoordsSet.has(`${r},${c+1}`);
 
-                            {/* Render tentative tile */}
-                            {tempTile && (
-                              <div 
-                                className="absolute rounded-[4px] flex flex-col items-center justify-center font-extrabold shadow scale-100"
-                                style={{
-                                  top: '-1px', left: '-1px', right: '-1px', bottom: '-1px',
-                                  fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
-                                  backgroundColor: customColors.scrTileBg,
-                                  color: customColors.scrTileText,
-                                  borderWidth: '1px', borderStyle: 'solid', borderColor: getTileOutlineColor('tentative', customColors.scrTileBg)
-                                }}
-                              >
-                                <span className={`leading-none ${tempTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.62}px` }}>{tempTile.letter}</span>
-                                <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.18}px`, bottom: `${cellSize * 0.03}px`, right: `${cellSize * 0.03}px` }}>{getTileScore(tempTile, roomData) || ''}</span>
-                                {tempTile.isBlank && <span className="absolute bg-amber-500 rounded-full ring-1 ring-white/30" style={{ top: `${cellSize * 0.08}px`, left: `${cellSize * 0.08}px`, width: `${cellSize * 0.14}px`, height: `${cellSize * 0.14}px` }} />}
-                              </div>
-                            )}
+                          return (
+                            <div
+                              key={key}
+                              onClick={() => handleBoardCellTap(r, c)}
+                              className={cellClassName}
+                              style={{ width: `${cellSize}px`, height: `${cellSize}px`, touchAction: 'manipulation', ...cellStyle }}
+                            >
+                              {/* Render permanent tile */}
+                              {permTile && (
+                                <div 
+                                  className="absolute rounded-[4px] flex flex-col items-center justify-center font-extrabold shadow scale-100"
+                                  style={{
+                                    top: '-1px', left: '-1px', right: '-1px', bottom: '-1px',
+                                    fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
+                                    backgroundColor: customColors.scrTileBg,
+                                    color: customColors.scrTileText,
+                                    borderWidth: '1px', borderStyle: 'solid', borderColor: getTileOutlineColor('permanent', customColors.scrTileBg)
+                                  }}
+                                >
+                                  <span className={`leading-none ${permTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.62}px` }}>{permTile.letter}</span>
+                                  <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.18}px`, bottom: `${cellSize * 0.03}px`, right: `${cellSize * 0.03}px`, color: customColors.scrTileText }}>{getTileScore(permTile, roomData) || ''}</span>
+                                  {permTile.isBlank && <span className="absolute bg-amber-500 rounded-full ring-1 ring-white/30" style={{ top: `${cellSize * 0.08}px`, left: `${cellSize * 0.08}px`, width: `${cellSize * 0.14}px`, height: `${cellSize * 0.14}px` }} title="Blank representation" />}
+                                </div>
+                              )}
 
-                            {/* Render default bonus label if empty */}
-                            {!permTile && !tempTile && (
-                              <span className="font-black tracking-tighter" style={{ fontSize: `${cellSize * 0.32}px` }}>{cellLabel}</span>
-                            )}
-                          </div>
-                        );
-                      })
-                    ))}
+                              {/* Render tentative tile */}
+                              {tempTile && (
+                                <div 
+                                  className="absolute rounded-[4px] flex flex-col items-center justify-center font-extrabold shadow scale-100"
+                                  style={{
+                                    top: '-1px', left: '-1px', right: '-1px', bottom: '-1px',
+                                    fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
+                                    backgroundColor: customColors.scrTileBg,
+                                    color: customColors.scrTileText,
+                                    borderWidth: '1px', borderStyle: 'solid', borderColor: getTileOutlineColor('tentative', customColors.scrTileBg)
+                                  }}
+                                >
+                                  <span className={`leading-none ${tempTile.isBlank ? 'italic' : ''}`} style={{ fontSize: `${cellSize * 0.62}px` }}>{tempTile.letter}</span>
+                                  <span className="absolute font-bold leading-none" style={{ fontSize: `${cellSize * 0.18}px`, bottom: `${cellSize * 0.03}px`, right: `${cellSize * 0.03}px` }}>{getTileScore(tempTile, roomData) || ''}</span>
+                                  {tempTile.isBlank && <span className="absolute bg-amber-500 rounded-full ring-1 ring-white/30" style={{ top: `${cellSize * 0.08}px`, left: `${cellSize * 0.08}px`, width: `${cellSize * 0.14}px`, height: `${cellSize * 0.14}px` }} />}
+                                </div>
+                              )}
+
+                              {/* Render default bonus label if empty */}
+                              {!permTile && !tempTile && (
+                                <span className="font-black tracking-tighter" style={{ fontSize: `${cellSize * 0.32}px` }}>{cellLabel}</span>
+                              )}
+
+                              {/* Render recently played word highlight boundary overlay */}
+                              {inLastPlay && (
+                                <div 
+                                  className="absolute pointer-events-none rounded-[4px]"
+                                  style={{
+                                    top: '-2px', left: '-2px', right: '-2px', bottom: '-2px',
+                                    borderTop: isTopBoundary ? `3px solid ${highlightColor}` : undefined,
+                                    borderBottom: isBottomBoundary ? `3px solid ${highlightColor}` : undefined,
+                                    borderLeft: isLeftBoundary ? `3px solid ${highlightColor}` : undefined,
+                                    borderRight: isRightBoundary ? `3px solid ${highlightColor}` : undefined,
+                                    zIndex: 15
+                                  }}
+                                />
+                              )}
+                            </div>
+                          );
+                        })
+                      ));
+                    })()}
                   </div>
                 </div>
               </div>
@@ -4434,6 +4534,12 @@ export default function App() {
                 localStorage.removeItem('scrabble_tile_outline_mode');
                 setCustomOutlines([{ id: '1', color: '#ff0000', types: [] }]);
                 localStorage.removeItem('scrabble_custom_outlines');
+                setFiveSecGreenFlashSetting(false);
+                localStorage.removeItem('scrabble_5s_green_flash');
+                setHighlightDuration('full turn');
+                localStorage.removeItem('scrabble_highlight_duration');
+                setHighlightColor('#eab308');
+                localStorage.removeItem('scrabble_highlight_color');
               }}
               className={`w-full py-2.5 rounded-xl text-xs font-bold transition border ${
                 isDark ? 'bg-slate-700 hover:bg-slate-600 border-slate-600 text-white' : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-800'
@@ -4630,6 +4736,77 @@ export default function App() {
                 </div>
               )}
             </div>
+
+            {/* Green turn-start flash setting */}
+            <div className={`border rounded-2xl p-4 space-y-3 ${
+              isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+            }`}>
+              <h3 className={`text-xs font-bold uppercase tracking-widest ${
+                isDark ? 'text-slate-400' : 'text-slate-505'
+              }`}>⚡ Turn Green Flash</h3>
+              <label className="flex items-center justify-between cursor-pointer text-xs font-bold">
+                <span className={isDark ? 'text-slate-350' : 'text-slate-700'}>5s green flash (Otherwise whole turn)</span>
+                <input
+                  type="checkbox"
+                  checked={fiveSecGreenFlashSetting}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setFiveSecGreenFlashSetting(checked);
+                    localStorage.setItem('scrabble_5s_green_flash', checked ? 'true' : 'false');
+                  }}
+                  className="accent-amber-500 h-4 w-4"
+                />
+              </label>
+            </div>
+
+            {/* Word Played Highlight Settings */}
+            <div className={`border rounded-2xl p-4 space-y-4 ${
+              isDark ? 'bg-[#15181d] border-[#21252d]' : 'bg-white border-slate-200'
+            }`}>
+              <h3 className={`text-xs font-bold uppercase tracking-widest ${
+                isDark ? 'text-slate-400' : 'text-slate-505'
+              }`}>✨ Played Word Highlight</h3>
+              
+              <div className="flex items-center justify-between">
+                <label className={`text-xs font-bold ${isDark ? 'text-slate-350' : 'text-slate-700'}`}>Highlight Duration:</label>
+                <select
+                  value={highlightDuration}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setHighlightDuration(val);
+                    localStorage.setItem('scrabble_highlight_duration', val);
+                  }}
+                  className={`text-xs rounded-lg p-2 border font-bold ${
+                    isDark ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-850'
+                  }`}
+                >
+                  <option value="full turn">Full Turn</option>
+                  <option value="5">5 seconds</option>
+                  <option value="10">10 seconds</option>
+                  <option value="15">15 seconds</option>
+                  <option value="30">30 seconds</option>
+                  <option value="60">60 seconds</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <label className={`text-xs font-bold ${isDark ? 'text-slate-350' : 'text-slate-700'}`}>Highlight Color:</label>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded border border-slate-400" style={{ backgroundColor: highlightColor }} />
+                  <input
+                    type="color"
+                    value={highlightColor}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setHighlightColor(val);
+                      localStorage.setItem('scrabble_highlight_color', val);
+                    }}
+                    className="w-9 h-9 rounded cursor-pointer border-0 bg-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       )}
